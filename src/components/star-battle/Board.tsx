@@ -169,9 +169,8 @@ export function Board({
                   points={zigzag(seg)}
                   fill="none"
                   stroke="var(--mark)"
-                  strokeWidth={0.045}
+                  strokeWidth={0.055}
                   strokeLinejoin="round"
-                  vectorEffect="non-scaling-stroke"
                 />
               )),
             )}
