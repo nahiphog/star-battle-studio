@@ -63,25 +63,25 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
+  --background: oklch(0.115 0.02 265);
+  --foreground: oklch(0.97 0.005 247);
+  --card: oklch(0.175 0.025 265);
+  --card-foreground: oklch(0.97 0.005 247);
+  --popover: oklch(0.175 0.025 265);
+  --popover-foreground: oklch(0.97 0.005 247);
+  --primary: oklch(0.82 0.14 90);
+  --primary-foreground: oklch(0.18 0.03 265);
+  --secondary: oklch(0.24 0.03 265);
+  --secondary-foreground: oklch(0.97 0.005 247);
+  --muted: oklch(0.24 0.03 265);
+  --muted-foreground: oklch(0.7 0.02 257);
+  --accent: oklch(0.3 0.04 265);
+  --accent-foreground: oklch(0.97 0.005 247);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --border: oklch(0.3 0.03 265);
+  --input: oklch(0.3 0.03 265);
+  --ring: oklch(0.82 0.14 90);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -141,4 +141,36 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
+}
+
+/* ---- Star Battle design tokens ---- */
+:root {
+  --region-0: oklch(0.62 0.13 285);
+  --region-1: oklch(0.55 0.04 60);
+  --region-2: oklch(0.66 0.09 130);
+  --region-3: oklch(0.65 0.09 60);
+  --region-4: oklch(0.78 0.1 90);
+  --region-5: oklch(0.58 0.1 10);
+  --region-6: oklch(0.68 0.11 265);
+  --region-7: oklch(0.66 0.02 220);
+  --region-8: oklch(0.62 0.11 40);
+  --arrow: oklch(0.62 0.24 25);
+  --grid-line: oklch(0.22 0.05 265);
+  --mark: oklch(1 0 0);
+}
+
+.rgn-0 { background-color: var(--region-0); }
+.rgn-1 { background-color: var(--region-1); }
+.rgn-2 { background-color: var(--region-2); }
+.rgn-3 { background-color: var(--region-3); }
+.rgn-4 { background-color: var(--region-4); }
+.rgn-5 { background-color: var(--region-5); }
+.rgn-6 { background-color: var(--region-6); }
+.rgn-7 { background-color: var(--region-7); }
+.rgn-8 { background-color: var(--region-8); }
+
+@theme inline {
+  --color-arrow: var(--arrow);
+  --color-grid-line: var(--grid-line);
+  --color-mark: var(--mark);
 }
