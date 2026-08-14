@@ -1,14 +1,17 @@
 import { useState } from "react";
-import { Zap, Trash2, RotateCcw } from "lucide-react";
+import { Zap, Trash2, RotateCcw, Presentation, FileDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Grid } from "@/lib/starbattle";
-import type { CellArrow } from "./Board";
+import { Board, type CellArrow } from "./Board";
+import { puzzleById } from "@/lib/starbattle";
 
 export type Snapshot = {
+  puzzleId: string;
   grid: Grid;
   rows: number[];
   cols: number[];
   regions: number[];
+  customCells: number[];
   arrows: CellArrow[];
 };
 
@@ -16,9 +19,25 @@ export type Note = {
   id: string;
   text: string;
   crux: boolean;
-  at: number;
   snapshot: Snapshot;
 };
+
+export function SnapshotBoard({ snapshot }: { snapshot: Snapshot }) {
+  const puzzle = puzzleById(snapshot.puzzleId);
+  return (
+    <Board
+      puzzle={puzzle}
+      grid={snapshot.grid}
+      conflictCells={new Set()}
+      highlightedRows={new Set(snapshot.rows)}
+      highlightedCols={new Set(snapshot.cols)}
+      highlightedRegions={new Set(snapshot.regions)}
+      customCells={new Set(snapshot.customCells)}
+      arrows={snapshot.arrows}
+      interactive={false}
+    />
+  );
+}
 
 type Props = {
   notes: Note[];
@@ -26,9 +45,19 @@ type Props = {
   onDelete: (id: string) => void;
   onToggleCrux: (id: string) => void;
   onRestore: (note: Note) => void;
+  onPresent: () => void;
+  onExportPdf: () => void;
 };
 
-export function Notes({ notes, onAdd, onDelete, onToggleCrux, onRestore }: Props) {
+export function Notes({
+  notes,
+  onAdd,
+  onDelete,
+  onToggleCrux,
+  onRestore,
+  onPresent,
+  onExportPdf,
+}: Props) {
   const [text, setText] = useState("");
   const [crux, setCrux] = useState(false);
 
@@ -45,8 +74,7 @@ export function Notes({ notes, onAdd, onDelete, onToggleCrux, onRestore }: Props
         Solution walkthrough
       </h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        Capture the reasoning behind the current grid. Each step stores a snapshot you can jump back
-        to.
+        Each step you add captures the grid exactly as it looks right now.
       </p>
 
       <textarea
@@ -75,9 +103,28 @@ export function Notes({ notes, onAdd, onDelete, onToggleCrux, onRestore }: Props
           onClick={submit}
           className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90"
         >
-          Add step
+          Add step + grid
         </button>
       </div>
+
+      {notes.length > 0 && (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={onPresent}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-xs font-medium text-secondary-foreground hover:bg-accent"
+          >
+            <Presentation className="h-4 w-4" /> Present slides
+          </button>
+          <button
+            type="button"
+            onClick={onExportPdf}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-xs font-medium text-secondary-foreground hover:bg-accent"
+          >
+            <FileDown className="h-4 w-4" /> Save as PDF
+          </button>
+        </div>
+      )}
 
       <ol className="mt-4 space-y-2">
         {notes.map((n, i) => (
@@ -120,7 +167,10 @@ export function Notes({ notes, onAdd, onDelete, onToggleCrux, onRestore }: Props
                 </button>
               </div>
             </div>
-            <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{n.text}</p>
+            <div className="mt-2 w-40">
+              <SnapshotBoard snapshot={n.snapshot} />
+            </div>
+            <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{n.text}</p>
             {n.crux && (
               <span className="mt-2 inline-block rounded bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
                 Crux — trivialises the puzzle

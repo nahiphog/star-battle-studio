@@ -1,41 +1,49 @@
 import { Star, X as XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  SIZE,
   idx,
+  perimeterOfCells,
   regionAt,
   regionPerimeter,
   zigzag,
   type Grid,
+  type Puzzle,
 } from "@/lib/starbattle";
 
 export type CellArrow = { from: number; to: number };
 
 type Props = {
+  puzzle: Puzzle;
   grid: Grid;
   conflictCells: Set<number>;
   highlightedRows: Set<number>;
   highlightedCols: Set<number>;
   highlightedRegions: Set<number>;
+  customCells: Set<number>;
   arrows: CellArrow[];
-  pendingArrow: number | null;
-  onCellClick: (i: number) => void;
-  onToggleRow: (r: number) => void;
-  onToggleCol: (c: number) => void;
+  pendingArrow?: number | null;
+  interactive?: boolean;
+  onCellClick?: (i: number) => void;
+  onToggleRow?: (r: number) => void;
+  onToggleCol?: (c: number) => void;
 };
 
 export function Board({
+  puzzle,
   grid,
   conflictCells,
   highlightedRows,
   highlightedCols,
   highlightedRegions,
+  customCells,
   arrows,
-  pendingArrow,
+  pendingArrow = null,
+  interactive = true,
   onCellClick,
   onToggleRow,
   onToggleCol,
 }: Props) {
+  const SIZE = puzzle.size;
   const center = (i: number) => ({ x: (i % SIZE) + 0.5, y: Math.floor(i / SIZE) + 0.5 });
 
   return (
@@ -43,13 +51,16 @@ export function Board({
       {/* column arrow gutter */}
       <div className="flex">
         <div className="w-6 shrink-0 sm:w-7" />
-        <div className="grid flex-1 grid-cols-9">
+        <div
+          className="grid flex-1"
+          style={{ gridTemplateColumns: `repeat(${SIZE}, minmax(0, 1fr))` }}
+        >
           {Array.from({ length: SIZE }, (_, c) => (
             <button
               key={c}
               type="button"
               aria-label={`Highlight column ${c + 1}`}
-              onClick={() => onToggleCol(c)}
+              onClick={() => onToggleCol?.(c)}
               className="flex h-6 items-end justify-center sm:h-7"
             >
               <svg viewBox="0 0 12 20" className="h-5 w-3">
@@ -76,7 +87,7 @@ export function Board({
               key={r}
               type="button"
               aria-label={`Highlight row ${r + 1}`}
-              onClick={() => onToggleRow(r)}
+              onClick={() => onToggleRow?.(r)}
               className="flex flex-1 items-center justify-end pr-0.5"
             >
               <svg viewBox="0 0 20 12" className="h-3 w-5">
@@ -96,25 +107,32 @@ export function Board({
 
         {/* board */}
         <div className="relative aspect-square flex-1 overflow-hidden rounded-md ring-2 ring-grid-line">
-          <div className="grid h-full w-full grid-cols-9 grid-rows-9">
+          <div
+            className="grid h-full w-full"
+            style={{
+              gridTemplateColumns: `repeat(${SIZE}, minmax(0, 1fr))`,
+              gridTemplateRows: `repeat(${SIZE}, minmax(0, 1fr))`,
+            }}
+          >
             {grid.map((cell, i) => {
               const r = Math.floor(i / SIZE);
               const c = i % SIZE;
-              const region = regionAt(r, c);
+              const region = regionAt(puzzle, r, c);
               const thick = "border-grid-line";
               return (
                 <button
                   key={i}
                   type="button"
-                  onClick={() => onCellClick(i)}
+                  disabled={!interactive}
+                  onClick={() => onCellClick?.(i)}
                   aria-label={`Row ${r + 1} column ${c + 1}`}
+                  style={{ backgroundColor: puzzle.colors[region] }}
                   className={cn(
-                    `rgn-${region}`,
                     "relative flex items-center justify-center border-[0.5px] border-grid-line/40 transition-[filter]",
-                    r > 0 && regionAt(r - 1, c) !== region && `border-t-2 ${thick}`,
-                    c > 0 && regionAt(r, c - 1) !== region && `border-l-2 ${thick}`,
-                    r < SIZE - 1 && regionAt(r + 1, c) !== region && `border-b-2 ${thick}`,
-                    c < SIZE - 1 && regionAt(r, c + 1) !== region && `border-r-2 ${thick}`,
+                    r > 0 && regionAt(puzzle, r - 1, c) !== region && `border-t-2 ${thick}`,
+                    c > 0 && regionAt(puzzle, r, c - 1) !== region && `border-l-2 ${thick}`,
+                    r < SIZE - 1 && regionAt(puzzle, r + 1, c) !== region && `border-b-2 ${thick}`,
+                    c < SIZE - 1 && regionAt(puzzle, r, c + 1) !== region && `border-r-2 ${thick}`,
                     (highlightedRows.has(r) || highlightedCols.has(c)) && "brightness-125",
                     pendingArrow === i && "ring-2 ring-inset ring-primary",
                   )}
@@ -137,6 +155,14 @@ export function Board({
                       style={{ color: cell.color ?? "var(--mark)" }}
                       strokeWidth={3}
                     />
+                  )}
+                  {cell.kind === "q" && (
+                    <span
+                      className="text-[min(4vw,1.5rem)] font-black leading-none"
+                      style={{ color: cell.color ?? "var(--mark)" }}
+                    >
+                      ?
+                    </span>
                   )}
                 </button>
               );
@@ -163,7 +189,7 @@ export function Board({
             </defs>
 
             {[...highlightedRegions].flatMap((region) =>
-              regionPerimeter(region).map((seg, k) => (
+              regionPerimeter(puzzle, region).map((seg, k) => (
                 <polyline
                   key={`${region}-${k}`}
                   points={zigzag(seg)}
@@ -174,6 +200,17 @@ export function Board({
                 />
               )),
             )}
+
+            {perimeterOfCells(SIZE, customCells).map((seg, k) => (
+              <polyline
+                key={`custom-${k}`}
+                points={zigzag(seg)}
+                fill="none"
+                stroke="var(--primary)"
+                strokeWidth={0.07}
+                strokeLinejoin="round"
+              />
+            ))}
 
             {arrows.map((a, k) => {
               const p1 = center(a.from);
