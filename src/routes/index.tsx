@@ -1,600 +1,230 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { toPng } from "html-to-image";
-import { jsPDF } from "jspdf";
-import {
-  Undo2,
-  RotateCcw,
-  Download,
-  MoveUpRight,
-  Eraser,
-  Shapes,
-  Star as StarIcon,
-  X as XIcon,
-  HelpCircle,
-  LassoSelect,
-} from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight, Plus, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Board, type CellArrow } from "@/components/star-battle/Board";
-import { Notes, SnapshotBoard, type Note, type Snapshot } from "@/components/star-battle/Notes";
-import { SlideDeck } from "@/components/star-battle/SlideDeck";
-import {
-  GUESS_COLORS,
-  PUZZLES,
-  cloneGrid,
-  conflicts,
-  eliminatedBy,
-  emptyGrid,
-  idx,
-  isSolved,
-  regionAt,
-  type Grid,
-  type MarkKind,
-} from "@/lib/starbattle";
+import { SiteHeader } from "@/components/SiteHeader";
+import { useAuth } from "@/hooks/useAuth";
+import { listPuzzles, toDateKey } from "@/lib/puzzles";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Star Battle Puzzle Editor — Solve & Annotate" },
+      { title: "Star Battle Studio — Nefarious Puzzles, Solved Step by Step" },
       {
         name: "description",
         content:
-          "Interactive Star Battle editor: place stars, Xs and question marks, auto-eliminate, highlight rows, columns, regions and custom cell groups, then present your solution as slides or a PDF.",
+          "A calendar of nefarious Star Battle puzzles — especially Netflix's — each with a detailed, hand-solved walkthrough you can replay, present or export.",
       },
-      { property: "og:title", content: "Star Battle Puzzle Editor — Solve & Annotate" },
+      { property: "og:title", content: "Star Battle Studio — Nefarious Puzzles, Solved Step by Step" },
       {
         property: "og:description",
         content:
-          "Solve Star Battle puzzles with guess mode, zigzag region highlights, custom regions, arrows and step-by-step reasoning you can present or export.",
+          "Browse Star Battle puzzles by date and follow the full reasoning behind every deduction, crux step included.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: StarBattlePage,
+  component: HomePage,
 });
 
-type Mode = "mark" | "arrow" | "region" | "custom";
-type Tool = "star" | "x" | "q" | "erase";
-const STORE_KEY = "star-battle-state-v2";
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-function StarBattlePage() {
-  const [puzzleId, setPuzzleId] = useState(PUZZLES[0]!.id);
-  const puzzle = useMemo(() => PUZZLES.find((p) => p.id === puzzleId) ?? PUZZLES[0]!, [puzzleId]);
-  const SIZE = puzzle.size;
+function HomePage() {
+  const { isEditor } = useAuth();
+  const { data: puzzles = [], isLoading } = useQuery({
+    queryKey: ["puzzles"],
+    queryFn: listPuzzles,
+  });
 
-  const [grid, setGrid] = useState<Grid>(() => emptyGrid(PUZZLES[0]!.size));
-  const [history, setHistory] = useState<Snapshot[]>([]);
-  const [autoX, setAutoX] = useState(true);
-  const [guessMode, setGuessMode] = useState(false);
-  const [guessColor, setGuessColor] = useState(GUESS_COLORS[0]!.value);
-  const [mode, setMode] = useState<Mode>("mark");
-  const [tool, setTool] = useState<Tool>("star");
-  const [rows, setRows] = useState<Set<number>>(new Set());
-  const [cols, setCols] = useState<Set<number>>(new Set());
-  const [regions, setRegions] = useState<Set<number>>(new Set());
-  const [customCells, setCustomCells] = useState<Set<number>>(new Set());
-  const [arrows, setArrows] = useState<CellArrow[]>([]);
-  const [pendingArrow, setPendingArrow] = useState<number | null>(null);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [presenting, setPresenting] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const boardRef = useRef<HTMLDivElement>(null);
-  const pdfRef = useRef<HTMLDivElement>(null);
+  const [cursor, setCursor] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
 
-  const solved = useMemo(() => isSolved(puzzle, grid), [puzzle, grid]);
-  const conflictCells = useMemo(() => conflicts(puzzle, grid), [puzzle, grid]);
-
-  // restore / persist
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORE_KEY);
-      if (!raw) return;
-      const d = JSON.parse(raw);
-      const p = PUZZLES.find((x) => x.id === d.puzzleId);
-      if (p) setPuzzleId(p.id);
-      if (p && d.grid?.length === p.size * p.size) setGrid(d.grid);
-      setRows(new Set(d.rows ?? []));
-      setCols(new Set(d.cols ?? []));
-      setRegions(new Set(d.regions ?? []));
-      setCustomCells(new Set(d.customCells ?? []));
-      setArrows(d.arrows ?? []);
-      setNotes(d.notes ?? []);
-      setAutoX(d.autoX ?? true);
-    } catch {
-      /* ignore */
+  const byDate = useMemo(() => {
+    const map = new Map<string, typeof puzzles>();
+    for (const p of puzzles) {
+      const list = map.get(p.playDate) ?? [];
+      list.push(p);
+      map.set(p.playDate, list);
     }
-  }, []);
+    return map;
+  }, [puzzles]);
 
-  useEffect(() => {
-    localStorage.setItem(
-      STORE_KEY,
-      JSON.stringify({
-        puzzleId,
-        grid,
-        rows: [...rows],
-        cols: [...cols],
-        regions: [...regions],
-        customCells: [...customCells],
-        arrows,
-        notes,
-        autoX,
-      }),
-    );
-  }, [puzzleId, grid, rows, cols, regions, customCells, arrows, notes, autoX]);
+  const days = useMemo(() => {
+    const first = new Date(cursor.year, cursor.month, 1);
+    const lead = (first.getDay() + 6) % 7; // Monday-first
+    const total = new Date(cursor.year, cursor.month + 1, 0).getDate();
+    const cells: Array<Date | null> = Array.from({ length: lead }, () => null);
+    for (let d = 1; d <= total; d++) cells.push(new Date(cursor.year, cursor.month, d));
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+  }, [cursor]);
 
-  const snapshot = useCallback(
-    (): Snapshot => ({
-      puzzleId,
-      grid: cloneGrid(grid),
-      rows: [...rows],
-      cols: [...cols],
-      regions: [...regions],
-      customCells: [...customCells],
-      arrows: arrows.map((a) => ({ ...a })),
-    }),
-    [puzzleId, grid, rows, cols, regions, customCells, arrows],
-  );
-
-  const pushHistory = useCallback(() => {
-    const snap = snapshot();
-    setHistory((h) => [...h.slice(-99), snap]);
-  }, [snapshot]);
-
-  const applySnapshot = (s: Snapshot) => {
-    setPuzzleId(s.puzzleId);
-    setGrid(cloneGrid(s.grid));
-    setRows(new Set(s.rows));
-    setCols(new Set(s.cols));
-    setRegions(new Set(s.regions));
-    setCustomCells(new Set(s.customCells ?? []));
-    setArrows(s.arrows.map((a) => ({ ...a })));
-  };
-
-  const undo = () => {
-    setHistory((h) => {
-      const last = h[h.length - 1];
-      if (last) applySnapshot(last);
-      return h.slice(0, -1);
+  const step = (delta: number) => {
+    setCursor(({ year, month }) => {
+      const next = new Date(year, month + delta, 1);
+      return { year: next.getFullYear(), month: next.getMonth() };
     });
   };
 
-  const switchPuzzle = (id: string) => {
-    const p = PUZZLES.find((x) => x.id === id);
-    if (!p) return;
-    pushHistory();
-    setPuzzleId(id);
-    setGrid(emptyGrid(p.size));
-    setRows(new Set());
-    setCols(new Set());
-    setRegions(new Set());
-    setCustomCells(new Set());
-    setArrows([]);
-    setPendingArrow(null);
-  };
-
-  const handleCellClick = (i: number) => {
-    const r = Math.floor(i / SIZE);
-    const c = i % SIZE;
-
-    if (mode === "region") {
-      pushHistory();
-      const region = regionAt(puzzle, r, c);
-      setRegions((prev) => {
-        const next = new Set(prev);
-        if (next.has(region)) next.delete(region);
-        else next.add(region);
-        return next;
-      });
-      return;
-    }
-
-    if (mode === "custom") {
-      pushHistory();
-      setCustomCells((prev) => {
-        const next = new Set(prev);
-        if (next.has(i)) next.delete(i);
-        else next.add(i);
-        return next;
-      });
-      return;
-    }
-
-    if (mode === "arrow") {
-      if (pendingArrow === null) {
-        setPendingArrow(i);
-      } else if (pendingArrow === i) {
-        setPendingArrow(null);
-      } else {
-        pushHistory();
-        setArrows((a) => [...a, { from: pendingArrow, to: i }]);
-        setPendingArrow(null);
-      }
-      return;
-    }
-
-    pushHistory();
-    setGrid((prev) => {
-      const next = cloneGrid(prev);
-      const color = guessMode || tool === "q" ? guessColor : undefined;
-      if (tool === "erase") {
-        next[i] = { kind: "empty" };
-        return next;
-      }
-      const kind: MarkKind = tool;
-      next[i] = { kind, ...(color ? { color } : {}) };
-      if (kind === "star" && autoX) {
-        for (const j of eliminatedBy(puzzle, r, c)) {
-          if (next[j]!.kind === "empty") next[j] = { kind: "x", ...(color ? { color } : {}) };
-        }
-      }
-      return next;
-    });
-  };
-
-  const toggleRow = (r: number) => {
-    pushHistory();
-    setRows((prev) => {
-      const n = new Set(prev);
-      if (n.has(r)) n.delete(r);
-      else n.add(r);
-      return n;
-    });
-  };
-
-  const toggleCol = (c: number) => {
-    pushHistory();
-    setCols((prev) => {
-      const n = new Set(prev);
-      if (n.has(c)) n.delete(c);
-      else n.add(c);
-      return n;
-    });
-  };
-
-  const resetGrid = () => {
-    pushHistory();
-    setGrid(emptyGrid(SIZE));
-    setArrows([]);
-    setRows(new Set());
-    setCols(new Set());
-    setRegions(new Set());
-    setCustomCells(new Set());
-    setPendingArrow(null);
-  };
-
-  const clearGuesses = () => {
-    pushHistory();
-    setGrid((prev) => prev.map((cell) => (cell.color ? { kind: "empty" as const } : cell)));
-  };
-
-  const saveImage = async () => {
-    if (!boardRef.current) return;
-    const url = await toPng(boardRef.current, { pixelRatio: 2, backgroundColor: "#0a0d16" });
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `star-battle-${puzzle.id}.png`;
-    a.click();
-  };
-
-  const addNote = (text: string, crux: boolean) =>
-    setNotes((n) => [...n, { id: crypto.randomUUID(), text, crux, snapshot: snapshot() }]);
-
-  // PDF export: render slides offscreen, capture each, stitch into a PDF.
-  useEffect(() => {
-    if (!exporting) return;
-    let cancelled = false;
-    const run = async () => {
-      const container = pdfRef.current;
-      if (!container) return;
-      await new Promise((res) => setTimeout(res, 250));
-      const slides = Array.from(container.children) as HTMLElement[];
-      const doc = new jsPDF({ orientation: "landscape", unit: "px", format: [1280, 720] });
-      for (let i = 0; i < slides.length; i++) {
-        const png = await toPng(slides[i]!, { pixelRatio: 2, backgroundColor: "#0a0d16" });
-        if (i > 0) doc.addPage([1280, 720], "landscape");
-        doc.addImage(png, "PNG", 0, 0, 1280, 720);
-      }
-      if (!cancelled) {
-        doc.save(`star-battle-walkthrough-${puzzle.id}.pdf`);
-        setExporting(false);
-      }
-    };
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [exporting, puzzle.id]);
+  const todayKey = toDateKey(new Date());
 
   return (
     <main className="min-h-screen bg-background px-4 py-8">
-      <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-4">
-          <header>
-            <p className="text-xs uppercase tracking-[0.25em] text-primary">{puzzle.source}</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              Star Battle Editor
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              One star per row, column and region. Stars may never touch — not even diagonally.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {PUZZLES.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => switchPuzzle(p.id)}
-                  className={cn(
-                    "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
-                    p.id === puzzleId
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-input bg-secondary text-secondary-foreground hover:bg-accent",
-                  )}
-                >
-                  {p.name} · {p.size}×{p.size}
-                </button>
-              ))}
-            </div>
-          </header>
+      <div className="mx-auto max-w-5xl">
+        <SiteHeader />
 
-          {/* mark tools */}
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3">
-            {(
-              [
-                { id: "star", label: "Star", icon: StarIcon },
-                { id: "x", label: "X", icon: XIcon },
-                { id: "q", label: "Question", icon: HelpCircle },
-                { id: "erase", label: "Erase", icon: Eraser },
-              ] as const
-            ).map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => {
-                  setTool(t.id);
-                  setMode("mark");
-                  setPendingArrow(null);
-                }}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-                  mode === "mark" && tool === t.id
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-input bg-secondary text-secondary-foreground hover:bg-accent",
-                )}
-              >
-                <t.icon className="h-4 w-4" /> {t.label}
-              </button>
-            ))}
-          </div>
+        <header className="rounded-2xl border border-border bg-card p-5">
+          <p className="text-xs uppercase tracking-[0.25em] text-primary">Star Battle</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            Nefarious Star Battle puzzles, solved in full
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            I enjoy solving nefarious Star Battle puzzles — in particular the daily ones published
+            by Netflix — and I show exactly how I solve them by hand. Every puzzle here comes with a
+            step-by-step walkthrough: the eliminations I make, the deductions they unlock, and the
+            crux step that finally trivialises the grid.
+          </p>
+          <p className="mt-3 max-w-2xl text-xs leading-relaxed text-muted-foreground/80">
+            Disclaimer: no copyright infringement is intended. Puzzle names and dates are cited
+            purely to credit their original publishers. The grids here are hand-recreated for
+            educational commentary and solving instruction, and this site is not affiliated with,
+            endorsed by, or sponsored by Netflix or any other publisher. If you own a puzzle
+            reproduced here and would like it removed, please get in touch and I will take it down.
+          </p>
+        </header>
 
-          <div ref={boardRef} className="rounded-xl border border-border bg-card p-3">
-            <Board
-              puzzle={puzzle}
-              grid={grid}
-              conflictCells={conflictCells}
-              highlightedRows={rows}
-              highlightedCols={cols}
-              highlightedRegions={regions}
-              customCells={customCells}
-              arrows={arrows}
-              pendingArrow={pendingArrow}
-              onCellClick={handleCellClick}
-              onToggleRow={toggleRow}
-              onToggleCol={toggleCol}
-            />
-          </div>
-
-          {(solved || conflictCells.size > 0) && (
-            <div
-              className={cn(
-                "rounded-lg px-3 py-2 text-sm font-medium",
-                solved ? "bg-primary text-primary-foreground" : "bg-arrow/15 text-arrow",
-              )}
-              role="status"
+        <section className="mt-6 rounded-2xl border border-border bg-card p-4">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => step(-1)}
+              aria-label="Previous month"
+              className="rounded-lg border border-input bg-secondary p-2 text-secondary-foreground hover:bg-accent"
             >
-              {solved
-                ? "Solved — every row, column and region has exactly one star."
-                : "Two stars conflict (shared row, column, region, or touching)."}
-            </div>
-          )}
-        </div>
-
-        <aside className="space-y-4">
-          {/* tools */}
-          <section className="space-y-3 rounded-xl border border-border bg-card p-4">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
             <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-              Highlighting
+              {MONTHS[cursor.month]} {cursor.year}
             </h2>
+            <button
+              type="button"
+              onClick={() => step(1)}
+              aria-label="Next month"
+              className="rounded-lg border border-input bg-secondary p-2 text-secondary-foreground hover:bg-accent"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              {(
-                [
-                  { id: "region", label: "Region", icon: Shapes },
-                  { id: "custom", label: "Custom", icon: LassoSelect },
-                  { id: "arrow", label: "Arrow", icon: MoveUpRight },
-                ] as const
-              ).map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => {
-                    setMode(mode === t.id ? "mark" : t.id);
-                    setPendingArrow(null);
-                  }}
-                  className={cn(
-                    "flex flex-col items-center gap-1 rounded-lg border px-2 py-2 text-xs font-medium transition-colors",
-                    mode === t.id
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-input bg-secondary text-secondary-foreground hover:bg-accent",
-                  )}
-                >
-                  <t.icon className="h-4 w-4" />
-                  {t.label}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {mode === "mark"
-                ? `Clicking a cell places ${tool === "erase" ? "nothing (erases)" : tool === "q" ? "a question mark" : `an ${tool === "x" ? "X" : "star"}`}.`
-                : mode === "region"
-                  ? "Click any cell to outline its region with a zigzag border."
-                  : mode === "custom"
-                    ? "Click cells to build your own custom region outline."
-                    : pendingArrow === null
-                      ? "Click the start cell, then the target cell."
-                      : "Now click the target cell (click the same cell to cancel)."}
-            </p>
-
-            <label className="flex items-center justify-between gap-2 rounded-lg border border-input bg-background/40 px-3 py-2 text-sm">
-              <span className="text-foreground">Auto-fill X after a star</span>
-              <input
-                type="checkbox"
-                checked={autoX}
-                onChange={(e) => setAutoX(e.target.checked)}
-                className="h-4 w-4 accent-[var(--primary)]"
-              />
-            </label>
-
-            <div className="rounded-lg border border-input bg-background/40 px-3 py-2">
-              <label className="flex items-center justify-between gap-2 text-sm">
-                <span className="text-foreground">Guess mode (coloured marks)</span>
-                <input
-                  type="checkbox"
-                  checked={guessMode}
-                  onChange={(e) => setGuessMode(e.target.checked)}
-                  className="h-4 w-4 accent-[var(--primary)]"
-                />
-              </label>
-              <div className="mt-2 flex items-center gap-2">
-                {GUESS_COLORS.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    title={c.name}
-                    onClick={() => setGuessColor(c.value)}
-                    className={cn(
-                      "h-6 w-6 rounded-full border-2",
-                      guessColor === c.value ? "border-foreground" : "border-transparent",
-                    )}
-                    style={{ backgroundColor: c.value }}
-                  />
-                ))}
-                <input
-                  type="color"
-                  value={guessColor}
-                  onChange={(e) => setGuessColor(e.target.value)}
-                  className="h-6 w-8 cursor-pointer rounded border border-input bg-transparent"
-                  title="Custom colour"
-                />
-              </div>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Question marks always use the selected colour.
-              </p>
-              <button
-                type="button"
-                onClick={clearGuesses}
-                className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-              >
-                <Eraser className="h-3.5 w-3.5" /> Clear coloured marks
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={undo}
-                disabled={history.length === 0}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-secondary-foreground hover:bg-accent disabled:opacity-40"
-              >
-                <Undo2 className="h-4 w-4" /> Undo
-              </button>
-              <button
-                type="button"
-                onClick={resetGrid}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-secondary-foreground hover:bg-accent"
-              >
-                <RotateCcw className="h-4 w-4" /> Reset grid
-              </button>
-              <button
-                type="button"
-                onClick={() => setArrows([])}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-secondary-foreground hover:bg-accent"
-              >
-                <MoveUpRight className="h-4 w-4" /> Clear arrows
-              </button>
-              <button
-                type="button"
-                onClick={saveImage}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
-              >
-                <Download className="h-4 w-4" /> Save image
-              </button>
-            </div>
-
-            {customCells.size > 0 && (
-              <button
-                type="button"
-                onClick={() => setCustomCells(new Set())}
-                className="text-xs text-muted-foreground hover:text-foreground"
-              >
-                Clear custom region ({customCells.size} cells)
-              </button>
-            )}
-          </section>
-
-          <Notes
-            notes={notes}
-            onAdd={addNote}
-            onDelete={(id) => setNotes((n) => n.filter((x) => x.id !== id))}
-            onToggleCrux={(id) =>
-              setNotes((n) => n.map((x) => (x.id === id ? { ...x, crux: !x.crux } : x)))
-            }
-            onRestore={(note) => {
-              pushHistory();
-              applySnapshot(note.snapshot);
-            }}
-            onPresent={() => setPresenting(true)}
-            onExportPdf={() => setExporting(true)}
-          />
-        </aside>
-      </div>
-
-      {presenting && notes.length > 0 && (
-        <SlideDeck title={puzzle.name} notes={notes} onClose={() => setPresenting(false)} />
-      )}
-
-      {exporting && (
-        <div className="fixed left-[-20000px] top-0" aria-hidden>
-          <div ref={pdfRef}>
-            {notes.map((n, i) => (
-              <div
-                key={n.id}
-                style={{ width: 1280, height: 720, backgroundColor: "#0a0d16" }}
-                className="flex gap-10 p-12"
-              >
-                <div style={{ width: 560 }}>
-                  <SnapshotBoard snapshot={n.snapshot} />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm uppercase tracking-[0.25em] text-primary">
-                    {puzzle.name} — Step {i + 1} of {notes.length}
-                  </p>
-                  {n.crux && (
-                    <p className="mt-3 inline-block rounded bg-primary/15 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
-                      Crux step
-                    </p>
-                  )}
-                  <p className="mt-4 whitespace-pre-wrap text-2xl leading-relaxed text-foreground">
-                    {n.text}
-                  </p>
-                </div>
-              </div>
+          <div className="mt-4 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {WEEKDAYS.map((d) => (
+              <span key={d}>{d}</span>
             ))}
           </div>
-        </div>
-      )}
+
+          <div className="mt-1 grid grid-cols-7 gap-1">
+            {days.map((day, i) => {
+              if (!day) return <div key={`empty-${i}`} className="min-h-20 rounded-lg" />;
+              const key = toDateKey(day);
+              const list = byDate.get(key) ?? [];
+              return (
+                <div
+                  key={key}
+                  className={cn(
+                    "min-h-20 rounded-lg border border-border bg-background/40 p-1.5",
+                    key === todayKey && "border-primary",
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold tabular-nums text-muted-foreground">
+                      {day.getDate()}
+                    </span>
+                    {isEditor && (
+                      <Link
+                        to="/edit/$id"
+                        params={{ id: "new" }}
+                        search={{ date: key }}
+                        aria-label={`Add a puzzle on ${key}`}
+                        className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </Link>
+                    )}
+                  </div>
+                  <div className="mt-1 space-y-1">
+                    {list.map((p) => (
+                      <Link
+                        key={p.id}
+                        to="/puzzle/$id"
+                        params={{ id: p.id }}
+                        className="block truncate rounded bg-primary/15 px-1.5 py-1 text-[10px] font-medium text-primary hover:bg-primary/25"
+                        title={p.name}
+                      >
+                        {p.size}×{p.size} · {p.name}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-2xl border border-border bg-card p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+            All puzzles
+          </h2>
+          {isLoading && <p className="mt-2 text-xs text-muted-foreground">Loading…</p>}
+          <ul className="mt-3 space-y-2">
+            {puzzles.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-2">
+                <Link
+                  to="/puzzle/$id"
+                  params={{ id: p.id }}
+                  className="flex items-center gap-2 text-sm text-foreground hover:text-primary"
+                >
+                  <Star className="h-3.5 w-3.5 text-primary" />
+                  {p.name}
+                  <span className="text-xs text-muted-foreground">
+                    {p.size}×{p.size} · {p.steps.length} steps
+                  </span>
+                </Link>
+                {isEditor && (
+                  <Link
+                    to="/edit/$id"
+                    params={{ id: p.id }}
+                    search={{ date: undefined }}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Edit grid
+                  </Link>
+                )}
+              </li>
+            ))}
+            {!isLoading && puzzles.length === 0 && (
+              <li className="text-xs text-muted-foreground">No puzzles yet.</li>
+            )}
+          </ul>
+        </section>
+      </div>
     </main>
   );
 }
-
-export { idx };

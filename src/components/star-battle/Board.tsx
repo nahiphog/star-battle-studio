@@ -12,6 +12,20 @@ import {
 
 export type CellArrow = { from: number; to: number };
 
+export type BoardStyleSettings = {
+  customColor: string;
+  customOpacity: number;
+  arrowColor: string;
+  arrowOpacity: number;
+};
+
+export const DEFAULT_BOARD_STYLE: BoardStyleSettings = {
+  customColor: "#8b5cf6",
+  customOpacity: 1,
+  arrowColor: "#ef4444",
+  arrowOpacity: 1,
+};
+
 type Props = {
   puzzle: Puzzle;
   grid: Grid;
@@ -23,6 +37,8 @@ type Props = {
   arrows: CellArrow[];
   pendingArrow?: number | null;
   interactive?: boolean;
+  showLabels?: boolean;
+  style?: BoardStyleSettings;
   onCellClick?: (i: number) => void;
   onToggleRow?: (r: number) => void;
   onToggleCol?: (c: number) => void;
@@ -39,18 +55,41 @@ export function Board({
   arrows,
   pendingArrow = null,
   interactive = true,
+  showLabels = true,
+  style = DEFAULT_BOARD_STYLE,
   onCellClick,
   onToggleRow,
   onToggleCol,
 }: Props) {
   const SIZE = puzzle.size;
   const center = (i: number) => ({ x: (i % SIZE) + 0.5, y: Math.floor(i / SIZE) + 0.5 });
+  const gutter = showLabels ? "w-9 shrink-0 sm:w-11" : "w-6 shrink-0 sm:w-7";
 
   return (
     <div className="w-full select-none">
+      {/* column labels */}
+      {showLabels && (
+        <div className="flex">
+          <div className={gutter} />
+          <div
+            className="grid flex-1"
+            style={{ gridTemplateColumns: `repeat(${SIZE}, minmax(0, 1fr))` }}
+          >
+            {Array.from({ length: SIZE }, (_, c) => (
+              <span
+                key={c}
+                className="text-center text-[10px] font-semibold tabular-nums text-muted-foreground sm:text-xs"
+              >
+                {c + 1}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* column arrow gutter */}
       <div className="flex">
-        <div className="w-6 shrink-0 sm:w-7" />
+        <div className={gutter} />
         <div
           className="grid flex-1"
           style={{ gridTemplateColumns: `repeat(${SIZE}, minmax(0, 1fr))` }}
@@ -67,8 +106,9 @@ export function Board({
                 {highlightedCols.has(c) ? (
                   <path
                     d="M6 19 L1 9 H4 V1 H8 V9 H11 Z"
-                    fill="var(--arrow)"
-                    stroke="var(--arrow)"
+                    fill={style.arrowColor}
+                    stroke={style.arrowColor}
+                    opacity={style.arrowOpacity}
                   />
                 ) : (
                   <circle cx="6" cy="14" r="1.6" fill="var(--muted-foreground)" opacity="0.5" />
@@ -80,22 +120,28 @@ export function Board({
       </div>
 
       <div className="flex">
-        {/* row arrow gutter */}
-        <div className="flex w-6 shrink-0 flex-col sm:w-7">
+        {/* row label + arrow gutter */}
+        <div className={cn("flex flex-col", gutter)}>
           {Array.from({ length: SIZE }, (_, r) => (
             <button
               key={r}
               type="button"
               aria-label={`Highlight row ${r + 1}`}
               onClick={() => onToggleRow?.(r)}
-              className="flex flex-1 items-center justify-end pr-0.5"
+              className="flex flex-1 items-center justify-end gap-1 pr-0.5"
             >
+              {showLabels && (
+                <span className="text-[10px] font-semibold tabular-nums text-muted-foreground sm:text-xs">
+                  {r + 1}
+                </span>
+              )}
               <svg viewBox="0 0 20 12" className="h-3 w-5">
                 {highlightedRows.has(r) ? (
                   <path
                     d="M19 6 L9 1 V4 H1 V8 H9 V11 Z"
-                    fill="var(--arrow)"
-                    stroke="var(--arrow)"
+                    fill={style.arrowColor}
+                    stroke={style.arrowColor}
+                    opacity={style.arrowOpacity}
                   />
                 ) : (
                   <circle cx="14" cy="6" r="1.6" fill="var(--muted-foreground)" opacity="0.5" />
@@ -146,7 +192,7 @@ export function Board({
                       style={{ color: cell.color ?? "var(--mark)" }}
                       fill="currentColor"
                       strokeWidth={1}
-                      stroke={conflictCells.has(i) ? "var(--arrow)" : "currentColor"}
+                      stroke={conflictCells.has(i) ? style.arrowColor : "currentColor"}
                     />
                   )}
                   {cell.kind === "x" && (
@@ -184,7 +230,7 @@ export function Board({
                 refY="2"
                 orient="auto"
               >
-                <path d="M0,0 L4,2 L0,4 Z" fill="var(--arrow)" />
+                <path d="M0,0 L4,2 L0,4 Z" fill={style.arrowColor} />
               </marker>
             </defs>
 
@@ -206,29 +252,32 @@ export function Board({
                 key={`custom-${k}`}
                 points={zigzag(seg)}
                 fill="none"
-                stroke="var(--primary)"
+                stroke={style.customColor}
+                strokeOpacity={style.customOpacity}
                 strokeWidth={0.07}
                 strokeLinejoin="round"
               />
             ))}
 
-            {arrows.map((a, k) => {
-              const p1 = center(a.from);
-              const p2 = center(a.to);
-              return (
-                <line
-                  key={k}
-                  x1={p1.x}
-                  y1={p1.y}
-                  x2={p2.x}
-                  y2={p2.y}
-                  stroke="var(--arrow)"
-                  strokeWidth={0.07}
-                  strokeLinecap="round"
-                  markerEnd="url(#sb-arrowhead)"
-                />
-              );
-            })}
+            <g opacity={style.arrowOpacity}>
+              {arrows.map((a, k) => {
+                const p1 = center(a.from);
+                const p2 = center(a.to);
+                return (
+                  <line
+                    key={k}
+                    x1={p1.x}
+                    y1={p1.y}
+                    x2={p2.x}
+                    y2={p2.y}
+                    stroke={style.arrowColor}
+                    strokeWidth={0.07}
+                    strokeLinecap="round"
+                    markerEnd="url(#sb-arrowhead)"
+                  />
+                );
+              })}
+            </g>
           </svg>
         </div>
       </div>

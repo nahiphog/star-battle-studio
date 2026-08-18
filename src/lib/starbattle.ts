@@ -133,7 +133,18 @@ export const PUZZLES: Puzzle[] = [
   },
 ];
 
-export const puzzleById = (id: string) => PUZZLES.find((p) => p.id === id) ?? PUZZLES[0]!;
+/** Region colours available when building a grid (taken from the published puzzles). */
+export const REGION_PALETTE = PALETTE;
+
+/** Puzzles loaded from the database, registered so snapshots can resolve them. */
+const registry = new Map<string, Puzzle>();
+
+export function registerPuzzles(puzzles: Puzzle[]) {
+  for (const p of puzzles) registry.set(p.id, p);
+}
+
+export const puzzleById = (id: string) =>
+  registry.get(id) ?? PUZZLES.find((p) => p.id === id) ?? PUZZLES[0]!;
 
 export type MarkKind = "empty" | "x" | "star" | "q";
 
