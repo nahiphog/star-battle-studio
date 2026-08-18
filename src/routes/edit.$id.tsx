@@ -18,7 +18,7 @@ import { REGION_PALETTE, emptyGrid, idx, type Grid, type Puzzle } from "@/lib/st
 
 export const Route = createFileRoute("/edit/$id")({
   validateSearch: (search: Record<string, unknown>) => ({
-    date: typeof search.date === "string" ? search.date : undefined,
+    date: typeof search["date"] === "string" ? (search["date"] as string) : undefined,
   }),
   head: () => ({
     meta: [
