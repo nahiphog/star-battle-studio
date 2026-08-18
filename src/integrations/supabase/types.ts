@@ -14,13 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      puzzles: {
+        Row: {
+          colors: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          play_date: string
+          regions: Json
+          size: number
+          solution: Json
+          source: string
+          steps: Json
+          updated_at: string
+        }
+        Insert: {
+          colors: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          play_date: string
+          regions: Json
+          size: number
+          solution: Json
+          source?: string
+          steps?: Json
+          updated_at?: string
+        }
+        Update: {
+          colors?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          play_date?: string
+          regions?: Json
+          size?: number
+          solution?: Json
+          source?: string
+          steps?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_site_editor: { Args: never; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
