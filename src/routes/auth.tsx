@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { LogIn } from "lucide-react";
 import { lovable } from "@/integrations/lovable/index";
-import { useAuth, EDITOR_EMAIL } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
