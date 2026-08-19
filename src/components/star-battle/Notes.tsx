@@ -80,9 +80,10 @@ export function Notes({
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        rows={3}
+        rows={6}
         placeholder="e.g. If any blue X were a star, it forces a star in the yellow region, leaving the blue region empty."
-        className="mt-3 w-full resize-y rounded-lg border border-input bg-background p-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring"
+        className="mt-3 min-h-40 w-full resize-y rounded-lg border border-input bg-background p-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring"
+
       />
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <button
