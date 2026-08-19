@@ -595,6 +595,14 @@ function Solver({
                 >
                   <Eraser className="h-3.5 w-3.5" /> Clear coloured marks
                 </button>
+                <button
+                  type="button"
+                  onClick={whitenXs}
+                  className="mt-2 block inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <XIcon className="h-3.5 w-3.5" /> Make all X white
+                </button>
+
               </div>
 
               <div className="grid grid-cols-2 gap-2">
