@@ -196,12 +196,15 @@ export function Board({
                     />
                   )}
                   {cell.kind === "x" && (
-                    <XIcon
-                      className="h-[55%] w-[55%]"
-                      style={{ color: cell.color ?? "var(--mark)" }}
-                      strokeWidth={3}
-                    />
+                    <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                      <XIcon
+                        className="h-[55%] w-[55%]"
+                        style={{ color: cell.color ?? "var(--mark)" }}
+                        strokeWidth={3}
+                      />
+                    </span>
                   )}
+
                   {cell.kind === "q" && (
                     <span
                       className="text-[min(4vw,1.5rem)] font-black leading-none"
