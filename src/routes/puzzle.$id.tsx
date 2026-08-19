@@ -338,6 +338,14 @@ function Solver({
     setGrid((prev) => prev.map((cell) => (cell.color ? { kind: "empty" as const } : cell)));
   };
 
+  const whitenXs = () => {
+    pushHistory();
+    setGrid((prev) =>
+      prev.map((cell) => (cell.kind === "x" ? { kind: "x" as const } : cell)),
+    );
+  };
+
+
   const saveImage = async () => {
     if (!boardRef.current) return;
     const url = await toPng(boardRef.current, { pixelRatio: 2, backgroundColor: "#0a0d16" });
@@ -488,7 +496,23 @@ function Solver({
                   : "Two stars conflict (shared row, column, region, or touching)."}
               </div>
             )}
+
+            <Notes
+              notes={notes}
+              onAdd={addNote}
+              onDelete={(id) => setNotes((n) => n.filter((x) => x.id !== id))}
+              onToggleCrux={(id) =>
+                setNotes((n) => n.map((x) => (x.id === id ? { ...x, crux: !x.crux } : x)))
+              }
+              onRestore={(note) => {
+                pushHistory();
+                applySnapshot(note.snapshot);
+              }}
+              onPresent={() => setPresenting(true)}
+              onExportPdf={() => setExporting(true)}
+            />
           </div>
+
 
           <aside className="space-y-4">
             <section className="space-y-3 rounded-xl border border-border bg-card p-4">
@@ -587,6 +611,14 @@ function Solver({
                 >
                   <Eraser className="h-3.5 w-3.5" /> Clear coloured marks
                 </button>
+                <button
+                  type="button"
+                  onClick={whitenXs}
+                  className="mt-2 block inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <XIcon className="h-3.5 w-3.5" /> Make all X white
+                </button>
+
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -660,20 +692,7 @@ function Solver({
               </button>
             </section>
 
-            <Notes
-              notes={notes}
-              onAdd={addNote}
-              onDelete={(id) => setNotes((n) => n.filter((x) => x.id !== id))}
-              onToggleCrux={(id) =>
-                setNotes((n) => n.map((x) => (x.id === id ? { ...x, crux: !x.crux } : x)))
-              }
-              onRestore={(note) => {
-                pushHistory();
-                applySnapshot(note.snapshot);
-              }}
-              onPresent={() => setPresenting(true)}
-              onExportPdf={() => setExporting(true)}
-            />
+
 
             <section className="rounded-xl border border-border bg-card p-4">
               {isEditor ? (
