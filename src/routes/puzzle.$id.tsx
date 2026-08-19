@@ -496,7 +496,23 @@ function Solver({
                   : "Two stars conflict (shared row, column, region, or touching)."}
               </div>
             )}
+
+            <Notes
+              notes={notes}
+              onAdd={addNote}
+              onDelete={(id) => setNotes((n) => n.filter((x) => x.id !== id))}
+              onToggleCrux={(id) =>
+                setNotes((n) => n.map((x) => (x.id === id ? { ...x, crux: !x.crux } : x)))
+              }
+              onRestore={(note) => {
+                pushHistory();
+                applySnapshot(note.snapshot);
+              }}
+              onPresent={() => setPresenting(true)}
+              onExportPdf={() => setExporting(true)}
+            />
           </div>
+
 
           <aside className="space-y-4">
             <section className="space-y-3 rounded-xl border border-border bg-card p-4">
