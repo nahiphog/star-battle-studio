@@ -668,20 +668,7 @@ function Solver({
               </button>
             </section>
 
-            <Notes
-              notes={notes}
-              onAdd={addNote}
-              onDelete={(id) => setNotes((n) => n.filter((x) => x.id !== id))}
-              onToggleCrux={(id) =>
-                setNotes((n) => n.map((x) => (x.id === id ? { ...x, crux: !x.crux } : x)))
-              }
-              onRestore={(note) => {
-                pushHistory();
-                applySnapshot(note.snapshot);
-              }}
-              onPresent={() => setPresenting(true)}
-              onExportPdf={() => setExporting(true)}
-            />
+
 
             <section className="rounded-xl border border-border bg-card p-4">
               {isEditor ? (
