@@ -338,6 +338,14 @@ function Solver({
     setGrid((prev) => prev.map((cell) => (cell.color ? { kind: "empty" as const } : cell)));
   };
 
+  const whitenXs = () => {
+    pushHistory();
+    setGrid((prev) =>
+      prev.map((cell) => (cell.kind === "x" ? { kind: "x" as const } : cell)),
+    );
+  };
+
+
   const saveImage = async () => {
     if (!boardRef.current) return;
     const url = await toPng(boardRef.current, { pixelRatio: 2, backgroundColor: "#0a0d16" });
