@@ -74,7 +74,7 @@ function AuthPage() {
 
         {session && !isEditor && (
           <p className="mt-4 rounded-lg border border-border bg-background/40 p-3 text-xs text-muted-foreground">
-            Signed in as {email}. This account cannot save changes.
+            You are signed in, but this account cannot save changes.
           </p>
         )}
 
