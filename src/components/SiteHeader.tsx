@@ -14,8 +14,7 @@ export function SiteHeader() {
         {email ? (
           <>
             <span className="text-muted-foreground">
-              {email}
-              {isEditor ? " · editor" : " · view only"}
+              {isEditor ? "Owner" : "View only"}
             </span>
             <button
               type="button"
