@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Star, X as XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -76,7 +77,8 @@ export function Board({
   }
 
   const arrowColors = [...new Set([style.arrowColor, ...arrows.map((a) => a.color ?? style.arrowColor)])];
-  const markerId = (color: string) => `sb-arrowhead-${arrowColors.indexOf(color)}`;
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
+  const markerId = (color: string) => `sb-arrow-${uid}-${arrowColors.indexOf(color)}`;
 
 
   return (
