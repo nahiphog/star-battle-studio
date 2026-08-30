@@ -34,7 +34,7 @@ export function SnapshotBoard({ snapshot }: { snapshot: Snapshot }) {
       highlightedCols={new Set(snapshot.cols)}
       highlightedRegions={new Set(snapshot.regions)}
       customCells={new Set(snapshot.customCells)}
-      customColors={snapshot.customColors}
+      customColors={snapshot.customColors ?? {}}
       arrows={snapshot.arrows}
       interactive={false}
     />
