@@ -10,7 +10,7 @@ import {
   type Puzzle,
 } from "@/lib/starbattle";
 
-export type CellArrow = { from: number; to: number };
+export type CellArrow = { from: number; to: number; color?: string };
 
 export type BoardStyleSettings = {
   customColor: string;
@@ -34,6 +34,7 @@ type Props = {
   highlightedCols: Set<number>;
   highlightedRegions: Set<number>;
   customCells: Set<number>;
+  customColors?: Record<number, string>;
   arrows: CellArrow[];
   pendingArrow?: number | null;
   interactive?: boolean;
