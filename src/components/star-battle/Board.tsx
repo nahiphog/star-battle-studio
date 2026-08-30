@@ -53,6 +53,7 @@ export function Board({
   highlightedCols,
   highlightedRegions,
   customCells,
+  customColors,
   arrows,
   pendingArrow = null,
   interactive = true,
@@ -65,6 +66,18 @@ export function Board({
   const SIZE = puzzle.size;
   const center = (i: number) => ({ x: (i % SIZE) + 0.5, y: Math.floor(i / SIZE) + 0.5 });
   const gutter = showLabels ? "w-9 shrink-0 sm:w-11" : "w-6 shrink-0 sm:w-7";
+
+  // group custom cells by their colour so each coloured region gets its own outline
+  const customGroups = new Map<string, Set<number>>();
+  for (const i of customCells) {
+    const color = customColors?.[i] ?? style.customColor;
+    if (!customGroups.has(color)) customGroups.set(color, new Set());
+    customGroups.get(color)!.add(i);
+  }
+
+  const arrowColors = [...new Set([style.arrowColor, ...arrows.map((a) => a.color ?? style.arrowColor)])];
+  const markerId = (color: string) => `sb-arrowhead-${arrowColors.indexOf(color)}`;
+
 
   return (
     <div className="w-full select-none">
