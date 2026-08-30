@@ -152,9 +152,13 @@ function Solver({
   const [cols, setCols] = useState<Set<number>>(new Set());
   const [regions, setRegions] = useState<Set<number>>(new Set());
   const [customCells, setCustomCells] = useState<Set<number>>(new Set());
+  const [customColors, setCustomColors] = useState<Record<number, string>>({});
+  const [drawCustomColor, setDrawCustomColor] = useState(DEFAULT_BOARD_STYLE.customColor);
+  const [drawArrowColor, setDrawArrowColor] = useState(DEFAULT_BOARD_STYLE.arrowColor);
   const [arrows, setArrows] = useState<CellArrow[]>([]);
   const [pendingArrow, setPendingArrow] = useState<number | null>(null);
   const [notes, setNotes] = useState<Note[]>(initialSteps);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [presenting, setPresenting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showLabels, setShowLabels] = useState(true);
@@ -179,6 +183,7 @@ function Solver({
       setCols(new Set(d.cols ?? []));
       setRegions(new Set(d.regions ?? []));
       setCustomCells(new Set(d.customCells ?? []));
+      setCustomColors(d.customColors ?? {});
       setArrows(d.arrows ?? []);
       setAutoX(d.autoX ?? true);
       setShowLabels(d.showLabels ?? true);
@@ -197,12 +202,13 @@ function Solver({
         cols: [...cols],
         regions: [...regions],
         customCells: [...customCells],
+        customColors,
         arrows,
         autoX,
         showLabels,
       }),
     );
-  }, [STORE_KEY, grid, rows, cols, regions, customCells, arrows, autoX, showLabels]);
+  }, [STORE_KEY, grid, rows, cols, regions, customCells, customColors, arrows, autoX, showLabels]);
 
   useEffect(() => {
     localStorage.setItem(STYLE_KEY, JSON.stringify(boardStyle));
@@ -216,9 +222,10 @@ function Solver({
       cols: [...cols],
       regions: [...regions],
       customCells: [...customCells],
+      customColors: { ...customColors },
       arrows: arrows.map((a) => ({ ...a })),
     }),
-    [puzzle.id, grid, rows, cols, regions, customCells, arrows],
+    [puzzle.id, grid, rows, cols, regions, customCells, customColors, arrows],
   );
 
   const pushHistory = useCallback(() => {
@@ -232,6 +239,7 @@ function Solver({
     setCols(new Set(s.cols));
     setRegions(new Set(s.regions));
     setCustomCells(new Set(s.customCells ?? []));
+    setCustomColors({ ...(s.customColors ?? {}) });
     setArrows(s.arrows.map((a) => ({ ...a })));
   };
 
@@ -261,10 +269,17 @@ function Solver({
 
     if (mode === "custom") {
       pushHistory();
+      const already = customCells.has(i) && (customColors[i] ?? drawCustomColor) === drawCustomColor;
       setCustomCells((prev) => {
         const next = new Set(prev);
-        if (next.has(i)) next.delete(i);
+        if (already) next.delete(i);
         else next.add(i);
+        return next;
+      });
+      setCustomColors((prev) => {
+        const next = { ...prev };
+        if (already) delete next[i];
+        else next[i] = drawCustomColor;
         return next;
       });
       return;
@@ -277,7 +292,7 @@ function Solver({
         setPendingArrow(null);
       } else {
         pushHistory();
-        setArrows((a) => [...a, { from: pendingArrow, to: i }]);
+        setArrows((a) => [...a, { from: pendingArrow, to: i, color: drawArrowColor }]);
         setPendingArrow(null);
       }
       return;
@@ -330,6 +345,7 @@ function Solver({
     setCols(new Set());
     setRegions(new Set());
     setCustomCells(new Set());
+    setCustomColors({});
     setPendingArrow(null);
   };
 
@@ -473,6 +489,7 @@ function Solver({
                 highlightedCols={cols}
                 highlightedRegions={regions}
                 customCells={customCells}
+                customColors={customColors}
                 arrows={arrows}
                 pendingArrow={pendingArrow}
                 showLabels={showLabels}
@@ -499,8 +516,12 @@ function Solver({
 
             <Notes
               notes={notes}
+              editingId={editingNoteId}
               onAdd={addNote}
-              onDelete={(id) => setNotes((n) => n.filter((x) => x.id !== id))}
+              onDelete={(id) => {
+                setNotes((n) => n.filter((x) => x.id !== id));
+                if (editingNoteId === id) setEditingNoteId(null);
+              }}
               onToggleCrux={(id) =>
                 setNotes((n) => n.map((x) => (x.id === id ? { ...x, crux: !x.crux } : x)))
               }
@@ -508,6 +529,19 @@ function Solver({
                 pushHistory();
                 applySnapshot(note.snapshot);
               }}
+              onStartEdit={(note) => {
+                pushHistory();
+                applySnapshot(note.snapshot);
+                setEditingNoteId(note.id);
+              }}
+              onSaveEdit={(noteId, text) => {
+                const snap = snapshot();
+                setNotes((n) =>
+                  n.map((x) => (x.id === noteId ? { ...x, text, snapshot: snap } : x)),
+                );
+                setEditingNoteId(null);
+              }}
+              onCancelEdit={() => setEditingNoteId(null)}
               onPresent={() => setPresenting(true)}
               onExportPdf={() => setExporting(true)}
             />
@@ -557,6 +591,33 @@ function Solver({
                       : pendingArrow === null
                         ? "Click the start cell, then the target cell."
                         : "Now click the target cell (click the same cell to cancel)."}
+              </p>
+
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex items-center justify-between gap-2 rounded-lg border border-input bg-background/40 px-2 py-2 text-xs text-foreground">
+                  Custom region colour
+                  <input
+                    type="color"
+                    value={drawCustomColor}
+                    onChange={(e) => setDrawCustomColor(e.target.value)}
+                    className="h-6 w-9 cursor-pointer rounded border border-input bg-transparent"
+                    aria-label="Colour for new custom regions"
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-2 rounded-lg border border-input bg-background/40 px-2 py-2 text-xs text-foreground">
+                  Arrow colour
+                  <input
+                    type="color"
+                    value={drawArrowColor}
+                    onChange={(e) => setDrawArrowColor(e.target.value)}
+                    className="h-6 w-9 cursor-pointer rounded border border-input bg-transparent"
+                    aria-label="Colour for new arrows"
+                  />
+                </label>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Pick a colour before drawing to build several differently coloured custom regions and
+                arrows on the same grid.
               </p>
 
               <label className="flex items-center justify-between gap-2 rounded-lg border border-input bg-background/40 px-3 py-2 text-sm">
@@ -656,7 +717,10 @@ function Solver({
               {customCells.size > 0 && (
                 <button
                   type="button"
-                  onClick={() => setCustomCells(new Set())}
+                  onClick={() => {
+                    setCustomCells(new Set());
+                    setCustomColors({});
+                  }}
                   className="text-xs text-muted-foreground hover:text-foreground"
                 >
                   Clear custom region ({customCells.size} cells)

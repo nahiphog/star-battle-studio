@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Star, X as XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -10,7 +11,7 @@ import {
   type Puzzle,
 } from "@/lib/starbattle";
 
-export type CellArrow = { from: number; to: number };
+export type CellArrow = { from: number; to: number; color?: string };
 
 export type BoardStyleSettings = {
   customColor: string;
@@ -34,6 +35,7 @@ type Props = {
   highlightedCols: Set<number>;
   highlightedRegions: Set<number>;
   customCells: Set<number>;
+  customColors?: Record<number, string>;
   arrows: CellArrow[];
   pendingArrow?: number | null;
   interactive?: boolean;
@@ -52,6 +54,7 @@ export function Board({
   highlightedCols,
   highlightedRegions,
   customCells,
+  customColors,
   arrows,
   pendingArrow = null,
   interactive = true,
@@ -64,6 +67,19 @@ export function Board({
   const SIZE = puzzle.size;
   const center = (i: number) => ({ x: (i % SIZE) + 0.5, y: Math.floor(i / SIZE) + 0.5 });
   const gutter = showLabels ? "w-9 shrink-0 sm:w-11" : "w-6 shrink-0 sm:w-7";
+
+  // group custom cells by their colour so each coloured region gets its own outline
+  const customGroups = new Map<string, Set<number>>();
+  for (const i of customCells) {
+    const color = customColors?.[i] ?? style.customColor;
+    if (!customGroups.has(color)) customGroups.set(color, new Set());
+    customGroups.get(color)!.add(i);
+  }
+
+  const arrowColors = [...new Set([style.arrowColor, ...arrows.map((a) => a.color ?? style.arrowColor)])];
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
+  const markerId = (color: string) => `sb-arrow-${uid}-${arrowColors.indexOf(color)}`;
+
 
   return (
     <div className="w-full select-none">
@@ -225,16 +241,19 @@ export function Board({
             className="pointer-events-none absolute inset-0 h-full w-full"
           >
             <defs>
-              <marker
-                id="sb-arrowhead"
-                markerWidth="4"
-                markerHeight="4"
-                refX="3"
-                refY="2"
-                orient="auto"
-              >
-                <path d="M0,0 L4,2 L0,4 Z" fill={style.arrowColor} />
-              </marker>
+              {arrowColors.map((color) => (
+                <marker
+                  key={color}
+                  id={markerId(color)}
+                  markerWidth="4"
+                  markerHeight="4"
+                  refX="3"
+                  refY="2"
+                  orient="auto"
+                >
+                  <path d="M0,0 L4,2 L0,4 Z" fill={color} />
+                </marker>
+              ))}
             </defs>
 
             {[...highlightedRegions].flatMap((region) =>
@@ -250,22 +269,25 @@ export function Board({
               )),
             )}
 
-            {perimeterOfCells(SIZE, customCells).map((seg, k) => (
-              <polyline
-                key={`custom-${k}`}
-                points={zigzag(seg)}
-                fill="none"
-                stroke={style.customColor}
-                strokeOpacity={style.customOpacity}
-                strokeWidth={0.07}
-                strokeLinejoin="round"
-              />
-            ))}
+            {[...customGroups].flatMap(([color, cells]) =>
+              perimeterOfCells(SIZE, cells).map((seg, k) => (
+                <polyline
+                  key={`custom-${color}-${k}`}
+                  points={zigzag(seg)}
+                  fill="none"
+                  stroke={color}
+                  strokeOpacity={style.customOpacity}
+                  strokeWidth={0.07}
+                  strokeLinejoin="round"
+                />
+              )),
+            )}
 
             <g opacity={style.arrowOpacity}>
               {arrows.map((a, k) => {
                 const p1 = center(a.from);
                 const p2 = center(a.to);
+                const color = a.color ?? style.arrowColor;
                 return (
                   <line
                     key={k}
@@ -273,14 +295,15 @@ export function Board({
                     y1={p1.y}
                     x2={p2.x}
                     y2={p2.y}
-                    stroke={style.arrowColor}
+                    stroke={color}
                     strokeWidth={0.07}
                     strokeLinecap="round"
-                    markerEnd="url(#sb-arrowhead)"
+                    markerEnd={`url(#${markerId(color)})`}
                   />
                 );
               })}
             </g>
+
           </svg>
         </div>
       </div>
