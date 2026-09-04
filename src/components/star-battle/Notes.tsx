@@ -1,5 +1,16 @@
 import { useState } from "react";
-import { Zap, Trash2, RotateCcw, Presentation, FileDown, Pencil, Save, X } from "lucide-react";
+import {
+  Zap,
+  Trash2,
+  RotateCcw,
+  Presentation,
+  FileArchive,
+  Pencil,
+  Save,
+  X,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Grid } from "@/lib/starbattle";
 import { Board, type CellArrow } from "./Board";
@@ -51,8 +62,9 @@ type Props = {
   onStartEdit: (note: Note) => void;
   onSaveEdit: (id: string, text: string) => void;
   onCancelEdit: () => void;
+  onMove: (id: string, delta: number) => void;
   onPresent: () => void;
-  onExportPdf: () => void;
+  onExportZip: () => void;
 };
 
 export function Notes({
@@ -65,8 +77,9 @@ export function Notes({
   onStartEdit,
   onSaveEdit,
   onCancelEdit,
+  onMove,
   onPresent,
-  onExportPdf,
+  onExportZip,
 }: Props) {
   const [text, setText] = useState("");
   const [crux, setCrux] = useState(false);
@@ -129,10 +142,10 @@ export function Notes({
           </button>
           <button
             type="button"
-            onClick={onExportPdf}
+            onClick={onExportZip}
             className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-xs font-medium text-secondary-foreground hover:bg-accent"
           >
-            <FileDown className="h-4 w-4" /> Save as PDF
+            <FileArchive className="h-4 w-4" /> Save steps as ZIP of PNGs
           </button>
         </div>
       )}
@@ -151,6 +164,24 @@ export function Notes({
               <div className="flex items-start justify-between gap-2">
                 <span className="text-xs font-semibold text-muted-foreground">Step {i + 1}</span>
                 <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    title="Move step up"
+                    disabled={i === 0}
+                    onClick={() => onMove(n.id, -1)}
+                    className="rounded p-1 text-muted-foreground hover:bg-accent disabled:opacity-30"
+                  >
+                    <ArrowUp className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Move step down"
+                    disabled={i === notes.length - 1}
+                    onClick={() => onMove(n.id, 1)}
+                    className="rounded p-1 text-muted-foreground hover:bg-accent disabled:opacity-30"
+                  >
+                    <ArrowDown className="h-3.5 w-3.5" />
+                  </button>
                   <button
                     type="button"
                     title="Toggle crux"
