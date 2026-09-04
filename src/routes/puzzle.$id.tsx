@@ -623,74 +623,8 @@ function Solver({
           <aside className="space-y-4">
             <section className="space-y-3 rounded-xl border border-border bg-card p-4">
               <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-                Highlighting
+                Board controls
               </h2>
-
-              <div className="grid grid-cols-3 gap-2">
-                {(
-                  [
-                    { id: "region", label: "Region", icon: Shapes },
-                    { id: "custom", label: "Custom", icon: LassoSelect },
-                    { id: "arrow", label: "Arrow", icon: MoveUpRight },
-                  ] as const
-                ).map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => {
-                      setMode(mode === t.id ? "mark" : t.id);
-                      setPendingArrow(null);
-                    }}
-                    className={cn(
-                      "flex flex-col items-center gap-1 rounded-lg border px-2 py-2 text-xs font-medium transition-colors",
-                      mode === t.id
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input bg-secondary text-secondary-foreground hover:bg-accent",
-                    )}
-                  >
-                    <t.icon className="h-4 w-4" />
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {mode === "mark"
-                  ? `Clicking a cell places ${tool === "erase" ? "nothing (erases)" : tool === "q" ? "a question mark" : `an ${tool === "x" ? "X" : "star"}`}.`
-                  : mode === "region"
-                    ? "Click any cell to outline its region with a zigzag border."
-                    : mode === "custom"
-                      ? "Click cells to build your own custom region outline."
-                      : pendingArrow === null
-                        ? "Click the start cell, then the target cell."
-                        : "Now click the target cell (click the same cell to cancel)."}
-              </p>
-
-              <div className="grid grid-cols-2 gap-2">
-                <label className="flex items-center justify-between gap-2 rounded-lg border border-input bg-background/40 px-2 py-2 text-xs text-foreground">
-                  Custom region colour
-                  <input
-                    type="color"
-                    value={drawCustomColor}
-                    onChange={(e) => setDrawCustomColor(e.target.value)}
-                    className="h-6 w-9 cursor-pointer rounded border border-input bg-transparent"
-                    aria-label="Colour for new custom regions"
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-2 rounded-lg border border-input bg-background/40 px-2 py-2 text-xs text-foreground">
-                  Arrow colour
-                  <input
-                    type="color"
-                    value={drawArrowColor}
-                    onChange={(e) => setDrawArrowColor(e.target.value)}
-                    className="h-6 w-9 cursor-pointer rounded border border-input bg-transparent"
-                    aria-label="Colour for new arrows"
-                  />
-                </label>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Pick a colour before drawing to build several differently coloured custom regions and
-                arrows on the same grid.
-              </p>
 
               <label className="flex items-center justify-between gap-2 rounded-lg border border-input bg-background/40 px-3 py-2 text-sm">
                 <span className="text-foreground">Auto-fill X after a star</span>
@@ -702,58 +636,6 @@ function Solver({
                 />
               </label>
 
-              <div className="rounded-lg border border-input bg-background/40 px-3 py-2">
-                <label className="flex items-center justify-between gap-2 text-sm">
-                  <span className="text-foreground">Guess mode (coloured marks)</span>
-                  <input
-                    type="checkbox"
-                    checked={guessMode}
-                    onChange={(e) => setGuessMode(e.target.checked)}
-                    className="h-4 w-4 accent-[var(--primary)]"
-                  />
-                </label>
-                <div className="mt-2 flex items-center gap-2">
-                  {GUESS_COLORS.map((c) => (
-                    <button
-                      key={c.value}
-                      type="button"
-                      title={c.name}
-                      onClick={() => setGuessColor(c.value)}
-                      className={cn(
-                        "h-6 w-6 rounded-full border-2",
-                        guessColor === c.value ? "border-foreground" : "border-transparent",
-                      )}
-                      style={{ backgroundColor: c.value }}
-                    />
-                  ))}
-                  <input
-                    type="color"
-                    value={guessColor}
-                    onChange={(e) => setGuessColor(e.target.value)}
-                    className="h-6 w-8 cursor-pointer rounded border border-input bg-transparent"
-                    title="Custom colour"
-                  />
-                </div>
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Question marks always use the selected colour.
-                </p>
-                <button
-                  type="button"
-                  onClick={clearGuesses}
-                  className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  <Eraser className="h-3.5 w-3.5" /> Clear coloured marks
-                </button>
-                <button
-                  type="button"
-                  onClick={whitenXs}
-                  className="mt-2 block inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  <XIcon className="h-3.5 w-3.5" /> Make all X white
-                </button>
-
-              </div>
-
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -762,6 +644,14 @@ function Solver({
                   className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-secondary-foreground hover:bg-accent disabled:opacity-40"
                 >
                   <Undo2 className="h-4 w-4" /> Undo
+                </button>
+                <button
+                  type="button"
+                  onClick={redo}
+                  disabled={future.length === 0}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-secondary-foreground hover:bg-accent disabled:opacity-40"
+                >
+                  <Redo2 className="h-4 w-4" /> Redo
                 </button>
                 <button
                   type="button"
@@ -776,6 +666,32 @@ function Solver({
                   className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-secondary-foreground hover:bg-accent"
                 >
                   <MoveUpRight className="h-4 w-4" /> Clear arrows
+                </button>
+                <button
+                  type="button"
+                  onClick={() => recolourMarks("#ffffff")}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-secondary-foreground hover:bg-accent"
+                >
+                  <Palette className="h-4 w-4" /> All marks white
+                </button>
+                <button
+                  type="button"
+                  onClick={() => recolourMarks("#000000")}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-secondary-foreground hover:bg-accent"
+                >
+                  <Palette className="h-4 w-4" /> All marks black
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowLabels((v) => !v)}
+                  className={cn(
+                    "inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors",
+                    showLabels
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-input bg-secondary text-secondary-foreground hover:bg-accent",
+                  )}
+                >
+                  <Hash className="h-4 w-4" /> {showLabels ? "Hide" : "Show"} numbers
                 </button>
                 <button
                   type="button"
