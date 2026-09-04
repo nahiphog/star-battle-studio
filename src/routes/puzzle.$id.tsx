@@ -466,46 +466,79 @@ function Solver({
               )}
             </header>
 
-            {/* mark tools */}
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3">
-              {(
-                [
-                  { id: "star", label: "Star", icon: StarIcon },
-                  { id: "x", label: "X", icon: XIcon },
-                  { id: "q", label: "Question", icon: HelpCircle },
-                  { id: "erase", label: "Erase", icon: Eraser },
-                ] as const
-              ).map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => {
-                    setTool(t.id);
-                    setMode("mark");
-                    setPendingArrow(null);
-                  }}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-                    mode === "mark" && tool === t.id
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-input bg-secondary text-secondary-foreground hover:bg-accent",
-                  )}
-                >
-                  <t.icon className="h-4 w-4" /> {t.label}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setShowLabels((v) => !v)}
-                className={cn(
-                  "ml-auto inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-                  showLabels
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-input bg-secondary text-secondary-foreground hover:bg-accent",
-                )}
-              >
-                <Hash className="h-4 w-4" /> {showLabels ? "Hide" : "Show"} numbers
-              </button>
+            {/* inputs: every drawing tool plus its colour, in one box */}
+            <div className="space-y-3 rounded-xl border border-border bg-card p-3">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Inputs
+              </h2>
+              <div className="flex flex-wrap items-center gap-2">
+                {INPUTS.map((t) => {
+                  const active = mode === t.mode && (t.mode !== "mark" || tool === t.tool);
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        setMode(t.mode);
+                        setTool(t.tool);
+                        setPendingArrow(null);
+                      }}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                        active
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-input bg-secondary text-secondary-foreground hover:bg-accent",
+                      )}
+                    >
+                      <t.icon className="h-4 w-4" /> {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {tool !== "erase" && (
+                <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                  <span className="text-xs text-muted-foreground">Colour</span>
+                  {MARK_COLORS.map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      title={c.name}
+                      aria-label={c.name}
+                      onClick={() => setDrawColor(c.value)}
+                      className={cn(
+                        "h-6 w-6 rounded-full border-2",
+                        drawColor.toLowerCase() === c.value.toLowerCase()
+                          ? "border-primary"
+                          : "border-input",
+                      )}
+                      style={{ backgroundColor: c.value }}
+                    />
+                  ))}
+                  <input
+                    type="color"
+                    value={drawColor}
+                    onChange={(e) => setDrawColor(e.target.value)}
+                    className="h-6 w-9 cursor-pointer rounded border border-input bg-transparent"
+                    title="Custom colour"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Used for stars, X's, question marks, custom regions and arrows.
+                  </p>
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                {mode === "mark"
+                  ? `Clicking a cell ${tool === "erase" ? "erases it" : tool === "q" ? "places a question mark" : `places ${tool === "x" ? "an X" : "a star"}`}.`
+                  : mode === "region"
+                    ? "Click any cell to outline its region with a zigzag border."
+                    : mode === "custom"
+                      ? "Click cells to build your own custom region outline."
+                      : pendingArrow === null
+                        ? "Click the start cell, then the target cell."
+                        : "Now click the target cell (click the same cell to cancel)."}
+              </p>
             </div>
 
             <div ref={boardRef} className="rounded-xl border border-border bg-card p-3">
