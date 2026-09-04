@@ -2,13 +2,25 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Puzzle } from "@/lib/starbattle";
 import type { Note } from "@/components/star-battle/Notes";
 
-export type PuzzleRecord = Puzzle & { playDate: string; steps: Note[] };
+export type PuzzleCategory = "walkthrough" | "uniqueness";
+
+export const CATEGORY_LABEL: Record<PuzzleCategory, string> = {
+  walkthrough: "Walkthroughs of difficult puzzles",
+  uniqueness: "Spotting uniqueness in Star Battle",
+};
+
+export type PuzzleRecord = Puzzle & {
+  playDate: string;
+  category: PuzzleCategory;
+  steps: Note[];
+};
 
 export type PuzzleInput = {
   playDate: string;
   name: string;
   source: string;
   size: number;
+  category: PuzzleCategory;
   regions: number[][];
   colors: string[];
   solution: number[];
@@ -20,6 +32,7 @@ type Row = {
   name: string;
   source: string;
   size: number;
+  category?: string | null;
   regions: unknown;
   colors: unknown;
   solution: unknown;
@@ -32,6 +45,7 @@ const toRecord = (row: Row): PuzzleRecord => ({
   name: row.name,
   source: row.source,
   size: row.size,
+  category: (row.category === "uniqueness" ? "uniqueness" : "walkthrough") as PuzzleCategory,
   regions: row.regions as number[][],
   colors: row.colors as string[],
   solution: row.solution as number[],
@@ -43,6 +57,7 @@ const toRow = (input: PuzzleInput) => ({
   name: input.name,
   source: input.source,
   size: input.size,
+  category: input.category,
   regions: input.regions,
   colors: input.colors,
   solution: input.solution,
@@ -100,3 +115,14 @@ export async function deletePuzzle(id: string) {
 /** yyyy-mm-dd in local time (no UTC shifting). */
 export const toDateKey = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** "5 May 2026" from a yyyy-mm-dd key. */
+export const formatPlayDate = (key: string) => {
+  const [y, m, d] = key.split("-").map(Number);
+  if (!y || !m || !d) return key;
+  return new Date(y, m - 1, d).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+};
