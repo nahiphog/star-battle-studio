@@ -7,11 +7,13 @@ import { Board } from "@/components/star-battle/Board";
 import { SiteHeader } from "@/components/SiteHeader";
 import { useAuth } from "@/hooks/useAuth";
 import {
+  CATEGORY_LABEL,
   createPuzzle,
   deletePuzzle,
   getPuzzle,
   toDateKey,
   updatePuzzle,
+  type PuzzleCategory,
   type PuzzleInput,
 } from "@/lib/puzzles";
 import { REGION_PALETTE, emptyGrid, idx, type Grid, type Puzzle } from "@/lib/starbattle";
@@ -45,12 +47,15 @@ type Draft = {
   name: string;
   source: string;
   size: number;
+  category: PuzzleCategory;
   regions: number[][];
   colors: string[];
   solution: number[];
 };
 
+/** -1 marks a region-less cell (used by uniqueness studies). */
 const blankRegions = (size: number) => Array.from({ length: size }, () => Array(size).fill(0));
+const REGIONLESS = -1;
 const defaultColors = (size: number) =>
   Array.from({ length: size }, (_, i) => REGION_PALETTE[i % REGION_PALETTE.length]!);
 
@@ -73,6 +78,7 @@ function EditPage() {
     name: "",
     source: "Netflix Star Battle",
     size: 9,
+    category: "walkthrough",
     regions: blankRegions(9),
     colors: defaultColors(9),
     solution: Array(9).fill(-1),
@@ -89,6 +95,7 @@ function EditPage() {
       name: record.name,
       source: record.source,
       size: record.size,
+      category: record.category,
       regions: record.regions,
       colors: record.colors,
       solution: record.solution,
@@ -148,6 +155,10 @@ function EditPage() {
   const validate = (d: Draft): string | null => {
     if (!d.name.trim()) return "Give the puzzle a name.";
     if (!d.playDate) return "Pick a date for the puzzle.";
+    if (d.category === "uniqueness") {
+      // Uniqueness studies may be partial: region-less cells and missing stars are fine.
+      return null;
+    }
     const used = new Set(d.regions.flat());
     for (let k = 0; k < d.size; k++) if (!used.has(k)) return `Region ${k + 1} has no cells yet.`;
     if (d.solution.some((c) => c < 0)) return "Place exactly one star in every row.";
@@ -305,8 +316,25 @@ function EditPage() {
                   ))}
                 </select>
               </label>
+              <label className="block text-xs font-medium text-muted-foreground">
+                Category
+                <select
+                  value={draft.category}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, category: e.target.value as PuzzleCategory }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                >
+                  {(["walkthrough", "uniqueness"] as const).map((c) => (
+                    <option key={c} value={c}>
+                      {CATEGORY_LABEL[c]}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <p className="text-[11px] text-muted-foreground">
-                Changing the size clears the regions and solution.
+                Changing the size clears the regions and solution. Uniqueness studies may leave
+                cells region-less and rows without stars.
               </p>
             </section>
 
@@ -314,6 +342,22 @@ function EditPage() {
               <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
                 Regions & colours
               </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveRegion(REGIONLESS);
+                  setPaintMode("regions");
+                }}
+                className={cn(
+                  "mt-3 flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-xs font-medium",
+                  activeRegion === REGIONLESS
+                    ? "border-primary text-foreground"
+                    : "border-input text-muted-foreground hover:bg-accent",
+                )}
+              >
+                <span className="h-4 w-4 rounded border border-input bg-card" aria-hidden />
+                No region (blank cell)
+              </button>
               <div className="mt-3 space-y-2">
                 {draft.colors.map((color, region) => (
                   <div key={region} className="flex items-center gap-2">

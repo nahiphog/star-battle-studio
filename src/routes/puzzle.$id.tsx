@@ -18,6 +18,7 @@ import {
   Hash,
   Save,
   Pencil,
+  Palette,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Board, DEFAULT_BOARD_STYLE, type BoardStyleSettings, type CellArrow } from "@/components/star-battle/Board";
@@ -183,7 +184,12 @@ function Solver({
   const boardRef = useRef<HTMLDivElement>(null);
   const pdfRef = useRef<HTMLDivElement>(null);
 
-  const solved = useMemo(() => isSolved(puzzle, grid), [puzzle, grid]);
+  const fullSolution =
+    puzzle.solution.length === puzzle.size && !puzzle.solution.includes(-1);
+  const solved = useMemo(
+    () => fullSolution && isSolved(puzzle, grid),
+    [fullSolution, puzzle, grid],
+  );
   const conflictCells = useMemo(() => conflicts(puzzle, grid), [puzzle, grid]);
 
   // restore local progress + editor style settings
