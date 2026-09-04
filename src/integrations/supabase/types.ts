@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       puzzles: {
         Row: {
+          category: string
           colors: Json
           created_at: string
           created_by: string | null
@@ -30,6 +31,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          category?: string
           colors: Json
           created_at?: string
           created_by?: string | null
@@ -44,6 +46,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category?: string
           colors?: Json
           created_at?: string
           created_by?: string | null

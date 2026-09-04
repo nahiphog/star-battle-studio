@@ -1,0 +1,1 @@
+ALTER TABLE public.puzzles ADD COLUMN IF NOT EXISTS category text NOT NULL DEFAULT 'walkthrough';
