@@ -76,10 +76,11 @@ export function Board({
     customGroups.get(color)!.add(i);
   }
 
-  const arrowColors = [...new Set([style.arrowColor, ...arrows.map((a) => a.color ?? style.arrowColor)])];
+  const arrowColors = [
+    ...new Set([style.arrowColor, ...arrows.map((a) => a.color ?? style.arrowColor)]),
+  ];
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const markerId = (color: string) => `sb-arrow-${uid}-${arrowColors.indexOf(color)}`;
-
 
   return (
     <div className="w-full select-none">
@@ -188,7 +189,7 @@ export function Board({
                   disabled={!interactive}
                   onClick={() => onCellClick?.(i)}
                   aria-label={`Row ${r + 1} column ${c + 1}`}
-                  style={{ backgroundColor: puzzle.colors[region] }}
+                  style={{ backgroundColor: puzzle.colors[region] ?? "var(--card)" }}
                   className={cn(
                     "relative flex items-center justify-center border-[0.5px] border-grid-line/40 transition-[filter]",
                     r > 0 && regionAt(puzzle, r - 1, c) !== region && `border-t-2 ${thick}`,
@@ -223,7 +224,7 @@ export function Board({
 
                   {cell.kind === "q" && (
                     <span
-                      className="text-[min(4vw,1.5rem)] font-black leading-none"
+                      className="pointer-events-none absolute inset-0 flex items-center justify-center text-[min(9vw,3.25rem)] font-black leading-none"
                       style={{ color: cell.color ?? "var(--mark)" }}
                     >
                       ?
@@ -303,7 +304,6 @@ export function Board({
                 );
               })}
             </g>
-
           </svg>
         </div>
       </div>

@@ -2,9 +2,10 @@ import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
-import { jsPDF } from "jspdf";
+import JSZip from "jszip";
 import {
   Undo2,
+  Redo2,
   RotateCcw,
   Download,
   MoveUpRight,
@@ -17,9 +18,15 @@ import {
   Hash,
   Save,
   Pencil,
+  Palette,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Board, DEFAULT_BOARD_STYLE, type BoardStyleSettings, type CellArrow } from "@/components/star-battle/Board";
+import {
+  Board,
+  DEFAULT_BOARD_STYLE,
+  type BoardStyleSettings,
+  type CellArrow,
+} from "@/components/star-battle/Board";
 import { Notes, SnapshotBoard, type Note, type Snapshot } from "@/components/star-battle/Notes";
 import { SlideDeck } from "@/components/star-battle/SlideDeck";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -64,6 +71,23 @@ export const Route = createFileRoute("/puzzle/$id")({
 type Mode = "mark" | "arrow" | "region" | "custom";
 type Tool = "star" | "x" | "q" | "erase";
 const STYLE_KEY = "star-battle-style-v1";
+
+/** Every input the user can pick, collated into one control. */
+const INPUTS = [
+  { id: "star", mode: "mark", tool: "star", label: "Star", icon: StarIcon },
+  { id: "x", mode: "mark", tool: "x", label: "X", icon: XIcon },
+  { id: "q", mode: "mark", tool: "q", label: "Question mark", icon: HelpCircle },
+  { id: "erase", mode: "mark", tool: "erase", label: "Erase", icon: Eraser },
+  { id: "region", mode: "region", tool: "star", label: "Region", icon: Shapes },
+  { id: "custom", mode: "custom", tool: "star", label: "Custom region", icon: LassoSelect },
+  { id: "arrow", mode: "arrow", tool: "star", label: "Arrow", icon: MoveUpRight },
+] as const;
+
+const MARK_COLORS = [
+  { name: "Black", value: "#000000" },
+  { name: "White", value: "#ffffff" },
+  ...GUESS_COLORS,
+];
 
 function PuzzlePage() {
   const { id } = useParams({ from: "/puzzle/$id" });
@@ -143,9 +167,9 @@ function Solver({
 
   const [grid, setGrid] = useState<Grid>(() => emptyGrid(puzzle.size));
   const [history, setHistory] = useState<Snapshot[]>([]);
+  const [future, setFuture] = useState<Snapshot[]>([]);
   const [autoX, setAutoX] = useState(true);
-  const [guessMode, setGuessMode] = useState(false);
-  const [guessColor, setGuessColor] = useState(GUESS_COLORS[0]!.value);
+  const [drawColor, setDrawColor] = useState(MARK_COLORS[0]!.value);
   const [mode, setMode] = useState<Mode>("mark");
   const [tool, setTool] = useState<Tool>("star");
   const [rows, setRows] = useState<Set<number>>(new Set());
@@ -153,8 +177,6 @@ function Solver({
   const [regions, setRegions] = useState<Set<number>>(new Set());
   const [customCells, setCustomCells] = useState<Set<number>>(new Set());
   const [customColors, setCustomColors] = useState<Record<number, string>>({});
-  const [drawCustomColor, setDrawCustomColor] = useState(DEFAULT_BOARD_STYLE.customColor);
-  const [drawArrowColor, setDrawArrowColor] = useState(DEFAULT_BOARD_STYLE.arrowColor);
   const [arrows, setArrows] = useState<CellArrow[]>([]);
   const [pendingArrow, setPendingArrow] = useState<number | null>(null);
   const [notes, setNotes] = useState<Note[]>(initialSteps);
@@ -167,7 +189,11 @@ function Solver({
   const boardRef = useRef<HTMLDivElement>(null);
   const pdfRef = useRef<HTMLDivElement>(null);
 
-  const solved = useMemo(() => isSolved(puzzle, grid), [puzzle, grid]);
+  const fullSolution = puzzle.solution.length === puzzle.size && !puzzle.solution.includes(-1);
+  const solved = useMemo(
+    () => fullSolution && isSolved(puzzle, grid),
+    [fullSolution, puzzle, grid],
+  );
   const conflictCells = useMemo(() => conflicts(puzzle, grid), [puzzle, grid]);
 
   // restore local progress + editor style settings
@@ -231,6 +257,7 @@ function Solver({
   const pushHistory = useCallback(() => {
     const snap = snapshot();
     setHistory((h) => [...h.slice(-99), snap]);
+    setFuture([]);
   }, [snapshot]);
 
   const applySnapshot = (s: Snapshot) => {
@@ -244,11 +271,21 @@ function Solver({
   };
 
   const undo = () => {
-    setHistory((h) => {
-      const last = h[h.length - 1];
-      if (last) applySnapshot(last);
-      return h.slice(0, -1);
-    });
+    const last = history[history.length - 1];
+    if (!last) return;
+    const current = snapshot();
+    setFuture((f) => [current, ...f].slice(0, 100));
+    applySnapshot(last);
+    setHistory((h) => h.slice(0, -1));
+  };
+
+  const redo = () => {
+    const next = future[0];
+    if (!next) return;
+    const current = snapshot();
+    setHistory((h) => [...h.slice(-99), current]);
+    applySnapshot(next);
+    setFuture((f) => f.slice(1));
   };
 
   const handleCellClick = (i: number) => {
@@ -269,7 +306,7 @@ function Solver({
 
     if (mode === "custom") {
       pushHistory();
-      const already = customCells.has(i) && (customColors[i] ?? drawCustomColor) === drawCustomColor;
+      const already = customCells.has(i) && (customColors[i] ?? drawColor) === drawColor;
       setCustomCells((prev) => {
         const next = new Set(prev);
         if (already) next.delete(i);
@@ -279,7 +316,7 @@ function Solver({
       setCustomColors((prev) => {
         const next = { ...prev };
         if (already) delete next[i];
-        else next[i] = drawCustomColor;
+        else next[i] = drawColor;
         return next;
       });
       return;
@@ -292,7 +329,7 @@ function Solver({
         setPendingArrow(null);
       } else {
         pushHistory();
-        setArrows((a) => [...a, { from: pendingArrow, to: i, color: drawArrowColor }]);
+        setArrows((a) => [...a, { from: pendingArrow, to: i, color: drawColor }]);
         setPendingArrow(null);
       }
       return;
@@ -301,7 +338,7 @@ function Solver({
     pushHistory();
     setGrid((prev) => {
       const next = cloneGrid(prev);
-      const color = guessMode || tool === "q" ? guessColor : undefined;
+      const color = drawColor;
       if (tool === "erase") {
         next[i] = { kind: "empty" };
         return next;
@@ -349,18 +386,12 @@ function Solver({
     setPendingArrow(null);
   };
 
-  const clearGuesses = () => {
-    pushHistory();
-    setGrid((prev) => prev.map((cell) => (cell.color ? { kind: "empty" as const } : cell)));
-  };
-
-  const whitenXs = () => {
+  const recolourMarks = (color: string) => {
     pushHistory();
     setGrid((prev) =>
-      prev.map((cell) => (cell.kind === "x" ? { kind: "x" as const } : cell)),
+      prev.map((cell) => (cell.kind === "empty" ? cell : { kind: cell.kind, color })),
     );
   };
-
 
   const saveImage = async () => {
     if (!boardRef.current) return;
@@ -384,7 +415,7 @@ function Solver({
     }
   };
 
-  // PDF export: render slides offscreen, capture each, stitch into a PDF.
+  // Export: render each step offscreen, capture as PNG, bundle into a ZIP.
   useEffect(() => {
     if (!exporting) return;
     let cancelled = false;
@@ -393,16 +424,22 @@ function Solver({
       if (!container) return;
       await new Promise((res) => setTimeout(res, 250));
       const slides = Array.from(container.children) as HTMLElement[];
-      const doc = new jsPDF({ orientation: "landscape", unit: "px", format: [1280, 720] });
+      const zip = new JSZip();
       for (let i = 0; i < slides.length; i++) {
         const png = await toPng(slides[i]!, { pixelRatio: 2, backgroundColor: "#0a0d16" });
-        if (i > 0) doc.addPage([1280, 720], "landscape");
-        doc.addImage(png, "PNG", 0, 0, 1280, 720);
+        zip.file(`step-${String(i + 1).padStart(2, "0")}.png`, png.split(",")[1]!, {
+          base64: true,
+        });
       }
-      if (!cancelled) {
-        doc.save(`star-battle-walkthrough-${puzzle.id}.pdf`);
-        setExporting(false);
-      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      if (cancelled) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `star-battle-walkthrough-${puzzle.id}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setExporting(false);
     };
     void run();
     return () => {
@@ -438,46 +475,79 @@ function Solver({
               )}
             </header>
 
-            {/* mark tools */}
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3">
-              {(
-                [
-                  { id: "star", label: "Star", icon: StarIcon },
-                  { id: "x", label: "X", icon: XIcon },
-                  { id: "q", label: "Question", icon: HelpCircle },
-                  { id: "erase", label: "Erase", icon: Eraser },
-                ] as const
-              ).map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => {
-                    setTool(t.id);
-                    setMode("mark");
-                    setPendingArrow(null);
-                  }}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-                    mode === "mark" && tool === t.id
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-input bg-secondary text-secondary-foreground hover:bg-accent",
-                  )}
-                >
-                  <t.icon className="h-4 w-4" /> {t.label}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setShowLabels((v) => !v)}
-                className={cn(
-                  "ml-auto inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-                  showLabels
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-input bg-secondary text-secondary-foreground hover:bg-accent",
-                )}
-              >
-                <Hash className="h-4 w-4" /> {showLabels ? "Hide" : "Show"} numbers
-              </button>
+            {/* inputs: every drawing tool plus its colour, in one box */}
+            <div className="space-y-3 rounded-xl border border-border bg-card p-3">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Inputs
+              </h2>
+              <div className="flex flex-wrap items-center gap-2">
+                {INPUTS.map((t) => {
+                  const active = mode === t.mode && (t.mode !== "mark" || tool === t.tool);
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        setMode(t.mode);
+                        setTool(t.tool);
+                        setPendingArrow(null);
+                      }}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                        active
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-input bg-secondary text-secondary-foreground hover:bg-accent",
+                      )}
+                    >
+                      <t.icon className="h-4 w-4" /> {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {tool !== "erase" && (
+                <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                  <span className="text-xs text-muted-foreground">Colour</span>
+                  {MARK_COLORS.map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      title={c.name}
+                      aria-label={c.name}
+                      onClick={() => setDrawColor(c.value)}
+                      className={cn(
+                        "h-6 w-6 rounded-full border-2",
+                        drawColor.toLowerCase() === c.value.toLowerCase()
+                          ? "border-primary"
+                          : "border-input",
+                      )}
+                      style={{ backgroundColor: c.value }}
+                    />
+                  ))}
+                  <input
+                    type="color"
+                    value={drawColor}
+                    onChange={(e) => setDrawColor(e.target.value)}
+                    className="h-6 w-9 cursor-pointer rounded border border-input bg-transparent"
+                    title="Custom colour"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Used for stars, X's, question marks, custom regions and arrows.
+                  </p>
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                {mode === "mark"
+                  ? `Clicking a cell ${tool === "erase" ? "erases it" : tool === "q" ? "places a question mark" : `places ${tool === "x" ? "an X" : "a star"}`}.`
+                  : mode === "region"
+                    ? "Click any cell to outline its region with a zigzag border."
+                    : mode === "custom"
+                      ? "Click cells to build your own custom region outline."
+                      : pendingArrow === null
+                        ? "Click the start cell, then the target cell."
+                        : "Now click the target cell (click the same cell to cancel)."}
+              </p>
             </div>
 
             <div ref={boardRef} className="rounded-xl border border-border bg-card p-3">
@@ -542,83 +612,27 @@ function Solver({
                 setEditingNoteId(null);
               }}
               onCancelEdit={() => setEditingNoteId(null)}
+              onMove={(id, delta) =>
+                setNotes((n) => {
+                  const from = n.findIndex((x) => x.id === id);
+                  const to = from + delta;
+                  if (from < 0 || to < 0 || to >= n.length) return n;
+                  const next = [...n];
+                  const [moved] = next.splice(from, 1);
+                  next.splice(to, 0, moved!);
+                  return next;
+                })
+              }
               onPresent={() => setPresenting(true)}
-              onExportPdf={() => setExporting(true)}
+              onExportZip={() => setExporting(true)}
             />
           </div>
-
 
           <aside className="space-y-4">
             <section className="space-y-3 rounded-xl border border-border bg-card p-4">
               <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-                Highlighting
+                Board controls
               </h2>
-
-              <div className="grid grid-cols-3 gap-2">
-                {(
-                  [
-                    { id: "region", label: "Region", icon: Shapes },
-                    { id: "custom", label: "Custom", icon: LassoSelect },
-                    { id: "arrow", label: "Arrow", icon: MoveUpRight },
-                  ] as const
-                ).map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => {
-                      setMode(mode === t.id ? "mark" : t.id);
-                      setPendingArrow(null);
-                    }}
-                    className={cn(
-                      "flex flex-col items-center gap-1 rounded-lg border px-2 py-2 text-xs font-medium transition-colors",
-                      mode === t.id
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input bg-secondary text-secondary-foreground hover:bg-accent",
-                    )}
-                  >
-                    <t.icon className="h-4 w-4" />
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {mode === "mark"
-                  ? `Clicking a cell places ${tool === "erase" ? "nothing (erases)" : tool === "q" ? "a question mark" : `an ${tool === "x" ? "X" : "star"}`}.`
-                  : mode === "region"
-                    ? "Click any cell to outline its region with a zigzag border."
-                    : mode === "custom"
-                      ? "Click cells to build your own custom region outline."
-                      : pendingArrow === null
-                        ? "Click the start cell, then the target cell."
-                        : "Now click the target cell (click the same cell to cancel)."}
-              </p>
-
-              <div className="grid grid-cols-2 gap-2">
-                <label className="flex items-center justify-between gap-2 rounded-lg border border-input bg-background/40 px-2 py-2 text-xs text-foreground">
-                  Custom region colour
-                  <input
-                    type="color"
-                    value={drawCustomColor}
-                    onChange={(e) => setDrawCustomColor(e.target.value)}
-                    className="h-6 w-9 cursor-pointer rounded border border-input bg-transparent"
-                    aria-label="Colour for new custom regions"
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-2 rounded-lg border border-input bg-background/40 px-2 py-2 text-xs text-foreground">
-                  Arrow colour
-                  <input
-                    type="color"
-                    value={drawArrowColor}
-                    onChange={(e) => setDrawArrowColor(e.target.value)}
-                    className="h-6 w-9 cursor-pointer rounded border border-input bg-transparent"
-                    aria-label="Colour for new arrows"
-                  />
-                </label>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Pick a colour before drawing to build several differently coloured custom regions and
-                arrows on the same grid.
-              </p>
 
               <label className="flex items-center justify-between gap-2 rounded-lg border border-input bg-background/40 px-3 py-2 text-sm">
                 <span className="text-foreground">Auto-fill X after a star</span>
@@ -630,58 +644,6 @@ function Solver({
                 />
               </label>
 
-              <div className="rounded-lg border border-input bg-background/40 px-3 py-2">
-                <label className="flex items-center justify-between gap-2 text-sm">
-                  <span className="text-foreground">Guess mode (coloured marks)</span>
-                  <input
-                    type="checkbox"
-                    checked={guessMode}
-                    onChange={(e) => setGuessMode(e.target.checked)}
-                    className="h-4 w-4 accent-[var(--primary)]"
-                  />
-                </label>
-                <div className="mt-2 flex items-center gap-2">
-                  {GUESS_COLORS.map((c) => (
-                    <button
-                      key={c.value}
-                      type="button"
-                      title={c.name}
-                      onClick={() => setGuessColor(c.value)}
-                      className={cn(
-                        "h-6 w-6 rounded-full border-2",
-                        guessColor === c.value ? "border-foreground" : "border-transparent",
-                      )}
-                      style={{ backgroundColor: c.value }}
-                    />
-                  ))}
-                  <input
-                    type="color"
-                    value={guessColor}
-                    onChange={(e) => setGuessColor(e.target.value)}
-                    className="h-6 w-8 cursor-pointer rounded border border-input bg-transparent"
-                    title="Custom colour"
-                  />
-                </div>
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Question marks always use the selected colour.
-                </p>
-                <button
-                  type="button"
-                  onClick={clearGuesses}
-                  className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  <Eraser className="h-3.5 w-3.5" /> Clear coloured marks
-                </button>
-                <button
-                  type="button"
-                  onClick={whitenXs}
-                  className="mt-2 block inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  <XIcon className="h-3.5 w-3.5" /> Make all X white
-                </button>
-
-              </div>
-
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -690,6 +652,14 @@ function Solver({
                   className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-secondary-foreground hover:bg-accent disabled:opacity-40"
                 >
                   <Undo2 className="h-4 w-4" /> Undo
+                </button>
+                <button
+                  type="button"
+                  onClick={redo}
+                  disabled={future.length === 0}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-secondary-foreground hover:bg-accent disabled:opacity-40"
+                >
+                  <Redo2 className="h-4 w-4" /> Redo
                 </button>
                 <button
                   type="button"
@@ -704,6 +674,32 @@ function Solver({
                   className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-secondary-foreground hover:bg-accent"
                 >
                   <MoveUpRight className="h-4 w-4" /> Clear arrows
+                </button>
+                <button
+                  type="button"
+                  onClick={() => recolourMarks("#ffffff")}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-secondary-foreground hover:bg-accent"
+                >
+                  <Palette className="h-4 w-4" /> All marks white
+                </button>
+                <button
+                  type="button"
+                  onClick={() => recolourMarks("#000000")}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-secondary-foreground hover:bg-accent"
+                >
+                  <Palette className="h-4 w-4" /> All marks black
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowLabels((v) => !v)}
+                  className={cn(
+                    "inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors",
+                    showLabels
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-input bg-secondary text-secondary-foreground hover:bg-accent",
+                  )}
+                >
+                  <Hash className="h-4 w-4" /> {showLabels ? "Hide" : "Show"} numbers
                 </button>
                 <button
                   type="button"
@@ -755,8 +751,6 @@ function Solver({
                 Reset to defaults
               </button>
             </section>
-
-
 
             <section className="rounded-xl border border-border bg-card p-4">
               {isEditor ? (

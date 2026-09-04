@@ -60,7 +60,6 @@ function AuthPage() {
           and solve freely.
         </p>
 
-
         <button
           type="button"
           onClick={signIn}
@@ -78,7 +77,10 @@ function AuthPage() {
           </p>
         )}
 
-        <Link to="/" className="mt-5 block text-center text-xs text-muted-foreground hover:text-foreground">
+        <Link
+          to="/"
+          className="mt-5 block text-center text-xs text-muted-foreground hover:text-foreground"
+        >
           Back to puzzles
         </Link>
       </div>

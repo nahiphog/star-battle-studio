@@ -245,8 +245,7 @@ export function perimeterOfCells(size: number, cells: Set<number>) {
 export function regionCells(p: Puzzle, region: number) {
   const set = new Set<number>();
   for (let r = 0; r < p.size; r++)
-    for (let c = 0; c < p.size; c++)
-      if (regionAt(p, r, c) === region) set.add(idx(p.size, r, c));
+    for (let c = 0; c < p.size; c++) if (regionAt(p, r, c) === region) set.add(idx(p.size, r, c));
   return set;
 }
 
