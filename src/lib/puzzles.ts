@@ -79,11 +79,7 @@ export async function getPuzzle(id: string): Promise<PuzzleRecord | null> {
 }
 
 export async function createPuzzle(input: PuzzleInput): Promise<PuzzleRecord> {
-  const { data, error } = await supabase
-    .from("puzzles")
-    .insert(toRow(input))
-    .select("*")
-    .single();
+  const { data, error } = await supabase.from("puzzles").insert(toRow(input)).select("*").single();
   if (error) throw error;
   return toRecord(data as unknown as Row);
 }

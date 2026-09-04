@@ -76,10 +76,11 @@ export function Board({
     customGroups.get(color)!.add(i);
   }
 
-  const arrowColors = [...new Set([style.arrowColor, ...arrows.map((a) => a.color ?? style.arrowColor)])];
+  const arrowColors = [
+    ...new Set([style.arrowColor, ...arrows.map((a) => a.color ?? style.arrowColor)]),
+  ];
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const markerId = (color: string) => `sb-arrow-${uid}-${arrowColors.indexOf(color)}`;
-
 
   return (
     <div className="w-full select-none">
@@ -303,7 +304,6 @@ export function Board({
                 );
               })}
             </g>
-
           </svg>
         </div>
       </div>

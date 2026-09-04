@@ -21,7 +21,10 @@ export const Route = createFileRoute("/")({
         content:
           "Nefarious Star Battle puzzles — especially Netflix's — each with a detailed, hand-solved walkthrough you can replay, present or export, plus studies of puzzle uniqueness.",
       },
-      { property: "og:title", content: "Star Battle Studio — Nefarious Puzzles, Solved Step by Step" },
+      {
+        property: "og:title",
+        content: "Star Battle Studio — Nefarious Puzzles, Solved Step by Step",
+      },
       {
         property: "og:description",
         content:

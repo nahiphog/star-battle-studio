@@ -21,7 +21,12 @@ import {
   Palette,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Board, DEFAULT_BOARD_STYLE, type BoardStyleSettings, type CellArrow } from "@/components/star-battle/Board";
+import {
+  Board,
+  DEFAULT_BOARD_STYLE,
+  type BoardStyleSettings,
+  type CellArrow,
+} from "@/components/star-battle/Board";
 import { Notes, SnapshotBoard, type Note, type Snapshot } from "@/components/star-battle/Notes";
 import { SlideDeck } from "@/components/star-battle/SlideDeck";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -184,8 +189,7 @@ function Solver({
   const boardRef = useRef<HTMLDivElement>(null);
   const pdfRef = useRef<HTMLDivElement>(null);
 
-  const fullSolution =
-    puzzle.solution.length === puzzle.size && !puzzle.solution.includes(-1);
+  const fullSolution = puzzle.solution.length === puzzle.size && !puzzle.solution.includes(-1);
   const solved = useMemo(
     () => fullSolution && isSolved(puzzle, grid),
     [fullSolution, puzzle, grid],
@@ -388,7 +392,6 @@ function Solver({
       prev.map((cell) => (cell.kind === "empty" ? cell : { kind: cell.kind, color })),
     );
   };
-
 
   const saveImage = async () => {
     if (!boardRef.current) return;
@@ -625,7 +628,6 @@ function Solver({
             />
           </div>
 
-
           <aside className="space-y-4">
             <section className="space-y-3 rounded-xl border border-border bg-card p-4">
               <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
@@ -749,8 +751,6 @@ function Solver({
                 Reset to defaults
               </button>
             </section>
-
-
 
             <section className="rounded-xl border border-border bg-card p-4">
               {isEditor ? (
