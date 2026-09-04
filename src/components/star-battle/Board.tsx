@@ -188,7 +188,7 @@ export function Board({
                   disabled={!interactive}
                   onClick={() => onCellClick?.(i)}
                   aria-label={`Row ${r + 1} column ${c + 1}`}
-                  style={{ backgroundColor: puzzle.colors[region] }}
+                  style={{ backgroundColor: puzzle.colors[region] ?? "var(--card)" }}
                   className={cn(
                     "relative flex items-center justify-center border-[0.5px] border-grid-line/40 transition-[filter]",
                     r > 0 && regionAt(puzzle, r - 1, c) !== region && `border-t-2 ${thick}`,
@@ -223,7 +223,7 @@ export function Board({
 
                   {cell.kind === "q" && (
                     <span
-                      className="text-[min(4vw,1.5rem)] font-black leading-none"
+                      className="pointer-events-none absolute inset-0 flex items-center justify-center text-[min(9vw,3.25rem)] font-black leading-none"
                       style={{ color: cell.color ?? "var(--mark)" }}
                     >
                       ?
