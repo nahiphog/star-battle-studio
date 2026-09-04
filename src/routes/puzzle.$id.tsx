@@ -2,9 +2,10 @@ import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
-import { jsPDF } from "jspdf";
+import JSZip from "jszip";
 import {
   Undo2,
+  Redo2,
   RotateCcw,
   Download,
   MoveUpRight,
@@ -64,6 +65,23 @@ export const Route = createFileRoute("/puzzle/$id")({
 type Mode = "mark" | "arrow" | "region" | "custom";
 type Tool = "star" | "x" | "q" | "erase";
 const STYLE_KEY = "star-battle-style-v1";
+
+/** Every input the user can pick, collated into one control. */
+const INPUTS = [
+  { id: "star", mode: "mark", tool: "star", label: "Star", icon: StarIcon },
+  { id: "x", mode: "mark", tool: "x", label: "X", icon: XIcon },
+  { id: "q", mode: "mark", tool: "q", label: "Question mark", icon: HelpCircle },
+  { id: "erase", mode: "mark", tool: "erase", label: "Erase", icon: Eraser },
+  { id: "region", mode: "region", tool: "star", label: "Region", icon: Shapes },
+  { id: "custom", mode: "custom", tool: "star", label: "Custom region", icon: LassoSelect },
+  { id: "arrow", mode: "arrow", tool: "star", label: "Arrow", icon: MoveUpRight },
+] as const;
+
+const MARK_COLORS = [
+  { name: "Black", value: "#000000" },
+  { name: "White", value: "#ffffff" },
+  ...GUESS_COLORS,
+];
 
 function PuzzlePage() {
   const { id } = useParams({ from: "/puzzle/$id" });
@@ -143,9 +161,9 @@ function Solver({
 
   const [grid, setGrid] = useState<Grid>(() => emptyGrid(puzzle.size));
   const [history, setHistory] = useState<Snapshot[]>([]);
+  const [future, setFuture] = useState<Snapshot[]>([]);
   const [autoX, setAutoX] = useState(true);
-  const [guessMode, setGuessMode] = useState(false);
-  const [guessColor, setGuessColor] = useState(GUESS_COLORS[0]!.value);
+  const [drawColor, setDrawColor] = useState(MARK_COLORS[0]!.value);
   const [mode, setMode] = useState<Mode>("mark");
   const [tool, setTool] = useState<Tool>("star");
   const [rows, setRows] = useState<Set<number>>(new Set());
@@ -153,8 +171,6 @@ function Solver({
   const [regions, setRegions] = useState<Set<number>>(new Set());
   const [customCells, setCustomCells] = useState<Set<number>>(new Set());
   const [customColors, setCustomColors] = useState<Record<number, string>>({});
-  const [drawCustomColor, setDrawCustomColor] = useState(DEFAULT_BOARD_STYLE.customColor);
-  const [drawArrowColor, setDrawArrowColor] = useState(DEFAULT_BOARD_STYLE.arrowColor);
   const [arrows, setArrows] = useState<CellArrow[]>([]);
   const [pendingArrow, setPendingArrow] = useState<number | null>(null);
   const [notes, setNotes] = useState<Note[]>(initialSteps);
@@ -231,6 +247,7 @@ function Solver({
   const pushHistory = useCallback(() => {
     const snap = snapshot();
     setHistory((h) => [...h.slice(-99), snap]);
+    setFuture([]);
   }, [snapshot]);
 
   const applySnapshot = (s: Snapshot) => {
@@ -244,11 +261,21 @@ function Solver({
   };
 
   const undo = () => {
-    setHistory((h) => {
-      const last = h[h.length - 1];
-      if (last) applySnapshot(last);
-      return h.slice(0, -1);
-    });
+    const last = history[history.length - 1];
+    if (!last) return;
+    const current = snapshot();
+    setFuture((f) => [current, ...f].slice(0, 100));
+    applySnapshot(last);
+    setHistory((h) => h.slice(0, -1));
+  };
+
+  const redo = () => {
+    const next = future[0];
+    if (!next) return;
+    const current = snapshot();
+    setHistory((h) => [...h.slice(-99), current]);
+    applySnapshot(next);
+    setFuture((f) => f.slice(1));
   };
 
   const handleCellClick = (i: number) => {
@@ -269,7 +296,7 @@ function Solver({
 
     if (mode === "custom") {
       pushHistory();
-      const already = customCells.has(i) && (customColors[i] ?? drawCustomColor) === drawCustomColor;
+      const already = customCells.has(i) && (customColors[i] ?? drawColor) === drawColor;
       setCustomCells((prev) => {
         const next = new Set(prev);
         if (already) next.delete(i);
@@ -279,7 +306,7 @@ function Solver({
       setCustomColors((prev) => {
         const next = { ...prev };
         if (already) delete next[i];
-        else next[i] = drawCustomColor;
+        else next[i] = drawColor;
         return next;
       });
       return;
@@ -292,7 +319,7 @@ function Solver({
         setPendingArrow(null);
       } else {
         pushHistory();
-        setArrows((a) => [...a, { from: pendingArrow, to: i, color: drawArrowColor }]);
+        setArrows((a) => [...a, { from: pendingArrow, to: i, color: drawColor }]);
         setPendingArrow(null);
       }
       return;
@@ -301,7 +328,7 @@ function Solver({
     pushHistory();
     setGrid((prev) => {
       const next = cloneGrid(prev);
-      const color = guessMode || tool === "q" ? guessColor : undefined;
+      const color = drawColor;
       if (tool === "erase") {
         next[i] = { kind: "empty" };
         return next;
@@ -349,15 +376,10 @@ function Solver({
     setPendingArrow(null);
   };
 
-  const clearGuesses = () => {
-    pushHistory();
-    setGrid((prev) => prev.map((cell) => (cell.color ? { kind: "empty" as const } : cell)));
-  };
-
-  const whitenXs = () => {
+  const recolourMarks = (color: string) => {
     pushHistory();
     setGrid((prev) =>
-      prev.map((cell) => (cell.kind === "x" ? { kind: "x" as const } : cell)),
+      prev.map((cell) => (cell.kind === "empty" ? cell : { kind: cell.kind, color })),
     );
   };
 
@@ -384,7 +406,7 @@ function Solver({
     }
   };
 
-  // PDF export: render slides offscreen, capture each, stitch into a PDF.
+  // Export: render each step offscreen, capture as PNG, bundle into a ZIP.
   useEffect(() => {
     if (!exporting) return;
     let cancelled = false;
@@ -393,16 +415,22 @@ function Solver({
       if (!container) return;
       await new Promise((res) => setTimeout(res, 250));
       const slides = Array.from(container.children) as HTMLElement[];
-      const doc = new jsPDF({ orientation: "landscape", unit: "px", format: [1280, 720] });
+      const zip = new JSZip();
       for (let i = 0; i < slides.length; i++) {
         const png = await toPng(slides[i]!, { pixelRatio: 2, backgroundColor: "#0a0d16" });
-        if (i > 0) doc.addPage([1280, 720], "landscape");
-        doc.addImage(png, "PNG", 0, 0, 1280, 720);
+        zip.file(`step-${String(i + 1).padStart(2, "0")}.png`, png.split(",")[1]!, {
+          base64: true,
+        });
       }
-      if (!cancelled) {
-        doc.save(`star-battle-walkthrough-${puzzle.id}.pdf`);
-        setExporting(false);
-      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      if (cancelled) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `star-battle-walkthrough-${puzzle.id}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setExporting(false);
     };
     void run();
     return () => {
@@ -542,8 +570,19 @@ function Solver({
                 setEditingNoteId(null);
               }}
               onCancelEdit={() => setEditingNoteId(null)}
+              onMove={(id, delta) =>
+                setNotes((n) => {
+                  const from = n.findIndex((x) => x.id === id);
+                  const to = from + delta;
+                  if (from < 0 || to < 0 || to >= n.length) return n;
+                  const next = [...n];
+                  const [moved] = next.splice(from, 1);
+                  next.splice(to, 0, moved!);
+                  return next;
+                })
+              }
               onPresent={() => setPresenting(true)}
-              onExportPdf={() => setExporting(true)}
+              onExportZip={() => setExporting(true)}
             />
           </div>
 
