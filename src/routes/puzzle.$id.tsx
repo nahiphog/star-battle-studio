@@ -144,7 +144,6 @@ function PuzzlePage() {
     <Solver
       key={puzzle.id}
       puzzle={puzzle}
-      playDate={record.playDate}
       initialSteps={record.steps}
       initialMarks={record.initialMarks}
       isEditor={isEditor}
@@ -154,13 +153,11 @@ function PuzzlePage() {
 
 function Solver({
   puzzle,
-  playDate,
   initialSteps,
   initialMarks,
   isEditor,
 }: {
   puzzle: Puzzle;
-  playDate: string;
   initialSteps: Note[];
   initialMarks: InitialMark[];
   isEditor: boolean;
