@@ -31,7 +31,7 @@ import { Notes, SnapshotBoard, type Note, type Snapshot } from "@/components/sta
 import { SlideDeck } from "@/components/star-battle/SlideDeck";
 import { SiteHeader } from "@/components/SiteHeader";
 import { useAuth } from "@/hooks/useAuth";
-import { getPuzzle, saveSteps } from "@/lib/puzzles";
+import { getPuzzle, saveSteps, type InitialMark } from "@/lib/puzzles";
 import {
   GUESS_COLORS,
   cloneGrid,
@@ -144,8 +144,8 @@ function PuzzlePage() {
     <Solver
       key={puzzle.id}
       puzzle={puzzle}
-      playDate={record.playDate}
       initialSteps={record.steps}
+      initialMarks={record.initialMarks}
       isEditor={isEditor}
     />
   );
@@ -153,19 +153,27 @@ function PuzzlePage() {
 
 function Solver({
   puzzle,
-  playDate,
   initialSteps,
+  initialMarks,
   isEditor,
 }: {
   puzzle: Puzzle;
-  playDate: string;
   initialSteps: Note[];
+  initialMarks: InitialMark[];
   isEditor: boolean;
 }) {
   const SIZE = puzzle.size;
   const STORE_KEY = `star-battle-progress-${puzzle.id}`;
 
-  const [grid, setGrid] = useState<Grid>(() => emptyGrid(puzzle.size));
+  const startingGrid = useCallback((): Grid => {
+    const g = emptyGrid(puzzle.size);
+    for (const m of initialMarks) {
+      if (g[m.i]) g[m.i] = m.color ? { kind: m.kind, color: m.color } : { kind: m.kind };
+    }
+    return g;
+  }, [puzzle.size, initialMarks]);
+
+  const [grid, setGrid] = useState<Grid>(() => startingGrid());
   const [history, setHistory] = useState<Snapshot[]>([]);
   const [future, setFuture] = useState<Snapshot[]>([]);
   const [autoX, setAutoX] = useState(true);
@@ -376,7 +384,7 @@ function Solver({
 
   const resetGrid = () => {
     pushHistory();
-    setGrid(emptyGrid(SIZE));
+    setGrid(startingGrid());
     setArrows([]);
     setRows(new Set());
     setCols(new Set());
@@ -454,9 +462,7 @@ function Solver({
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-4">
             <header>
-              <p className="text-xs uppercase tracking-[0.25em] text-primary">
-                {puzzle.source} · {playDate}
-              </p>
+              <p className="text-xs uppercase tracking-[0.25em] text-primary">{puzzle.source}</p>
               <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
                 {puzzle.name}
               </h1>

@@ -1,0 +1,1 @@
+ALTER TABLE public.puzzles ADD COLUMN IF NOT EXISTS initial_marks jsonb NOT NULL DEFAULT '[]'::jsonb;

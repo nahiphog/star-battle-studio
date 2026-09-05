@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Save, Trash2, Paintbrush, Star as StarIcon } from "lucide-react";
+import { Save, Trash2, Paintbrush, Star as StarIcon, X as XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Board } from "@/components/star-battle/Board";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -13,6 +13,7 @@ import {
   getPuzzle,
   toDateKey,
   updatePuzzle,
+  type InitialMark,
   type PuzzleCategory,
   type PuzzleInput,
 } from "@/lib/puzzles";
@@ -51,11 +52,14 @@ type Draft = {
   regions: number[][];
   colors: string[];
   solution: number[];
+  initialMarks: InitialMark[];
 };
 
 /** -1 marks a region-less cell (used by uniqueness studies). */
 const blankRegions = (size: number) => Array.from({ length: size }, () => Array(size).fill(0));
 const REGIONLESS = -1;
+const regionlessRegions = (size: number) =>
+  Array.from({ length: size }, () => Array(size).fill(REGIONLESS));
 const defaultColors = (size: number) =>
   Array.from({ length: size }, (_, i) => REGION_PALETTE[i % REGION_PALETTE.length]!);
 
@@ -82,9 +86,10 @@ function EditPage() {
     regions: blankRegions(9),
     colors: defaultColors(9),
     solution: Array(9).fill(-1),
+    initialMarks: [],
   }));
   const [activeRegion, setActiveRegion] = useState(0);
-  const [paintMode, setPaintMode] = useState<"regions" | "solution">("regions");
+  const [paintMode, setPaintMode] = useState<"regions" | "solution" | "marks">("regions");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -99,6 +104,7 @@ function EditPage() {
       regions: record.regions,
       colors: record.colors,
       solution: record.solution,
+      initialMarks: record.initialMarks,
     });
   }, [record]);
 
@@ -120,16 +126,18 @@ function EditPage() {
     draft.solution.forEach((c, r) => {
       if (c >= 0) g[idx(draft.size, r, c)] = { kind: "star" };
     });
+    for (const m of draft.initialMarks) if (g[m.i]) g[m.i] = { kind: m.kind };
     return g;
-  }, [draft.size, draft.solution]);
+  }, [draft.size, draft.solution, draft.initialMarks]);
 
   const resize = (size: number) => {
     setDraft((d) => ({
       ...d,
       size,
-      regions: blankRegions(size),
+      regions: d.category === "uniqueness" ? regionlessRegions(size) : blankRegions(size),
       colors: defaultColors(size),
       solution: Array(size).fill(-1),
+      initialMarks: [],
     }));
     setActiveRegion(0);
   };
@@ -137,6 +145,16 @@ function EditPage() {
   const onCellClick = (i: number) => {
     const r = Math.floor(i / draft.size);
     const c = i % draft.size;
+    if (paintMode === "marks") {
+      setDraft((d) => {
+        const marks = d.initialMarks.filter((m) => m.i !== i);
+        const current = d.initialMarks.find((m) => m.i === i);
+        const next = !current ? "star" : current.kind === "star" ? "x" : null;
+        if (next) marks.push({ i, kind: next });
+        return { ...d, initialMarks: marks };
+      });
+      return;
+    }
     if (paintMode === "regions") {
       setDraft((d) => {
         const regions = d.regions.map((row) => [...row]);
@@ -154,7 +172,6 @@ function EditPage() {
 
   const validate = (d: Draft): string | null => {
     if (!d.name.trim()) return "Give the puzzle a name.";
-    if (!d.playDate) return "Pick a date for the puzzle.";
     if (d.category === "uniqueness") {
       // Uniqueness studies may be partial: region-less cells and missing stars are fine.
       return null;
@@ -232,7 +249,7 @@ function EditPage() {
         <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-3 rounded-xl border border-border bg-card p-3">
             <div className="flex gap-2">
-              {(["regions", "solution"] as const).map((m) => (
+              {(["regions", "solution", "marks"] as const).map((m) => (
                 <button
                   key={m}
                   type="button"
@@ -248,9 +265,13 @@ function EditPage() {
                     <>
                       <Paintbrush className="h-4 w-4" /> Paint regions
                     </>
-                  ) : (
+                  ) : m === "solution" ? (
                     <>
                       <StarIcon className="h-4 w-4" /> Set solution
+                    </>
+                  ) : (
+                    <>
+                      <XIcon className="h-4 w-4" /> Starting marks
                     </>
                   )}
                 </button>
@@ -270,7 +291,9 @@ function EditPage() {
             <p className="text-xs text-muted-foreground">
               {paintMode === "regions"
                 ? "Pick a region colour on the right, then click cells to assign them."
-                : "Click one cell per row to mark the star. Click again to clear it."}
+                : paintMode === "solution"
+                  ? "Click one cell per row to mark the star. Click again to clear it."
+                  : "Click a cell to cycle star → X → empty. These marks are saved with the grid."}
             </p>
           </div>
 
@@ -320,9 +343,19 @@ function EditPage() {
                 Category
                 <select
                   value={draft.category}
-                  onChange={(e) =>
-                    setDraft((d) => ({ ...d, category: e.target.value as PuzzleCategory }))
-                  }
+                  onChange={(e) => {
+                    const category = e.target.value as PuzzleCategory;
+                    setDraft((d) => ({
+                      ...d,
+                      category,
+                      regions:
+                        category === "uniqueness"
+                          ? regionlessRegions(d.size)
+                          : blankRegions(d.size),
+                      initialMarks: category === "uniqueness" ? d.initialMarks : [],
+                    }));
+                    setActiveRegion(category === "uniqueness" ? REGIONLESS : 0);
+                  }}
                   className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
                 >
                   {(["walkthrough", "uniqueness"] as const).map((c) => (
