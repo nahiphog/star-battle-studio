@@ -4,12 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Plus, Star } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  CATEGORY_LABEL,
-  listPuzzles,
-  type PuzzleCategory,
-  type PuzzleRecord,
-} from "@/lib/puzzles";
+import { CATEGORY_LABEL, listPuzzles, type PuzzleCategory, type PuzzleRecord } from "@/lib/puzzles";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -54,7 +49,6 @@ function HomePage() {
     return map;
   }, [puzzles]);
 
-
   return (
     <main className="min-h-screen bg-background px-4 py-8">
       <div className="mx-auto max-w-5xl">
@@ -71,8 +65,8 @@ function HomePage() {
             particularly nefarious.
           </p>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Separately, I want to share another way of tackling these puzzles using uniqueness of the
-            puzzles.
+            Separately, I want to share another way of tackling these puzzles using uniqueness of
+            the puzzles.
           </p>
           <p className="mt-3 max-w-2xl text-xs leading-relaxed text-muted-foreground/80">
             Disclaimer: no copyright infringement is intended. Puzzle names and dates are cited

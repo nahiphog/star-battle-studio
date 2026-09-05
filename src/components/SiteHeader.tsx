@@ -13,9 +13,7 @@ export function SiteHeader() {
       <div className="flex items-center gap-2 text-xs">
         {email ? (
           <>
-            <span className="text-muted-foreground">
-              {isEditor ? "Owner" : "View only"}
-            </span>
+            <span className="text-muted-foreground">{isEditor ? "Owner" : "View only"}</span>
             <button
               type="button"
               onClick={() => void signOut()}

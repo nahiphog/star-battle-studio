@@ -462,9 +462,7 @@ function Solver({
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-4">
             <header>
-              <p className="text-xs uppercase tracking-[0.25em] text-primary">
-                {puzzle.source}
-              </p>
+              <p className="text-xs uppercase tracking-[0.25em] text-primary">{puzzle.source}</p>
               <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
                 {puzzle.name}
               </h1>

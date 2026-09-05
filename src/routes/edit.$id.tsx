@@ -349,7 +349,9 @@ function EditPage() {
                       ...d,
                       category,
                       regions:
-                        category === "uniqueness" ? regionlessRegions(d.size) : blankRegions(d.size),
+                        category === "uniqueness"
+                          ? regionlessRegions(d.size)
+                          : blankRegions(d.size),
                       initialMarks: category === "uniqueness" ? d.initialMarks : [],
                     }));
                     setActiveRegion(category === "uniqueness" ? REGIONLESS : 0);
