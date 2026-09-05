@@ -21,6 +21,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          initial_marks: Json
           name: string
           play_date: string
           regions: Json
@@ -36,6 +37,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          initial_marks?: Json
           name: string
           play_date: string
           regions: Json
@@ -51,6 +53,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          initial_marks?: Json
           name?: string
           play_date?: string
           regions?: Json
