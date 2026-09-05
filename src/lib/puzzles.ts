@@ -1,6 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Puzzle } from "@/lib/starbattle";
 import type { Note } from "@/components/star-battle/Notes";
+import type { MarkKind } from "@/lib/starbattle";
+
+/** A mark saved with the grid itself (used by uniqueness studies). */
+export type InitialMark = { i: number; kind: MarkKind; color?: string };
 
 export type PuzzleCategory = "walkthrough" | "uniqueness";
 
@@ -13,6 +17,7 @@ export type PuzzleRecord = Puzzle & {
   playDate: string;
   category: PuzzleCategory;
   steps: Note[];
+  initialMarks: InitialMark[];
 };
 
 export type PuzzleInput = {
@@ -24,6 +29,7 @@ export type PuzzleInput = {
   regions: number[][];
   colors: string[];
   solution: number[];
+  initialMarks: InitialMark[];
 };
 
 type Row = {
@@ -37,6 +43,7 @@ type Row = {
   colors: unknown;
   solution: unknown;
   steps: unknown;
+  initial_marks?: unknown;
 };
 
 const toRecord = (row: Row): PuzzleRecord => ({
@@ -50,6 +57,7 @@ const toRecord = (row: Row): PuzzleRecord => ({
   colors: row.colors as string[],
   solution: row.solution as number[],
   steps: (row.steps ?? []) as Note[],
+  initialMarks: (row.initial_marks ?? []) as InitialMark[],
 });
 
 const toRow = (input: PuzzleInput) => ({
@@ -61,6 +69,7 @@ const toRow = (input: PuzzleInput) => ({
   regions: input.regions,
   colors: input.colors,
   solution: input.solution,
+  initial_marks: input.initialMarks,
 });
 
 export async function listPuzzles(): Promise<PuzzleRecord[]> {
