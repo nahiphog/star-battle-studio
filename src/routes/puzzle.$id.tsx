@@ -31,7 +31,7 @@ import { Notes, SnapshotBoard, type Note, type Snapshot } from "@/components/sta
 import { SlideDeck } from "@/components/star-battle/SlideDeck";
 import { SiteHeader } from "@/components/SiteHeader";
 import { useAuth } from "@/hooks/useAuth";
-import { getPuzzle, saveSteps } from "@/lib/puzzles";
+import { getPuzzle, saveSteps, type InitialMark } from "@/lib/puzzles";
 import {
   GUESS_COLORS,
   cloneGrid,
