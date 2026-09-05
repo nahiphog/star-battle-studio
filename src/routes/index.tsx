@@ -50,8 +50,11 @@ function HomePage() {
     const map = new Map<PuzzleCategory, PuzzleRecord[]>();
     for (const c of CATEGORIES) map.set(c, []);
     for (const p of puzzles) map.get(p.category)?.push(p);
+    for (const list of map.values())
+      list.sort((a, b) => (a.playDate ?? "").localeCompare(b.playDate ?? ""));
     return map;
   }, [puzzles]);
+
 
   return (
     <main className="min-h-screen bg-background px-4 py-8">
