@@ -6,7 +6,6 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { useAuth } from "@/hooks/useAuth";
 import {
   CATEGORY_LABEL,
-  formatPlayDate,
   listPuzzles,
   type PuzzleCategory,
   type PuzzleRecord,
@@ -67,12 +66,13 @@ function HomePage() {
             Nefarious Star Battle puzzles, solved in full
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            I enjoy solving nefarious Star Battle puzzles — in particular the daily ones published
-            by Netflix — and I show exactly how I solve them by hand. Every puzzle here comes with a
-            step-by-step walkthrough: the eliminations I make, the deductions they unlock, and the
-            crux step that finally trivialises the grid. A second collection studies what makes a
-            Star Battle grid uniquely solvable, using partial grids where some cells belong to no
-            region at all.
+            I love to solve star battle puzzles. In particular the ones produced by Netflix. In the
+            site, I will show my walkthrough on how I solve some of their puzzles that I find
+            particularly nefarious.
+          </p>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Separately, I want to share another way of tackling these puzzles using uniqueness of the
+            puzzles.
           </p>
           <p className="mt-3 max-w-2xl text-xs leading-relaxed text-muted-foreground/80">
             Disclaimer: no copyright infringement is intended. Puzzle names and dates are cited
@@ -113,10 +113,6 @@ function HomePage() {
                     >
                       <Star className="h-3.5 w-3.5 text-primary" />
                       {p.name}
-                      <span className="text-xs text-muted-foreground">
-                        Published {formatPlayDate(p.playDate)} · {p.size}×{p.size} ·{" "}
-                        {p.steps.length} steps
-                      </span>
                     </Link>
                     {isEditor && (
                       <Link
